@@ -1,0 +1,32 @@
+-f https://download.pytorch.org/whl/torch_stable.html
+
+# 固定与 CUDA 11.3 对应的官方 wheel
+torch==1.11.0+cu113
+torchvision==0.12.0+cu113
+
+# MuJoCo Python 绑定（示例兼容版本）
+mujoco-py==2.1.2.14
+
+# 常用 RL / 科学计算 / 训练可视化工具
+pyquaternion
+pyyaml
+pexpect
+matplotlib
+einops
+tqdm
+packaging
+h5py
+ipython
+getkey
+chardet
+numpy==1.23.2
+h5py_cache
+opencv-python
+scipy
+gym
+tensorboard
+wandb
+onnxruntime
+mujoco-python-viewer
+
+# 如需特定私有 torch wheel，可将上方 -f URL 替换为企业私有源或自定义 wheel 索引。

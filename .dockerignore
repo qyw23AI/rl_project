@@ -1,0 +1,15 @@
+# 排除大文件与敏感内容：减少构建上下文体积、提升构建速度，并避免密钥/隐私泄露到镜像历史。
+.git
+.vscode
+
+data/
+models/
+
+*.tar.gz
+*.tar
+mjkey.txt
+*.log
+
+__pycache__/
+**/__pycache__/
+*.pyc
