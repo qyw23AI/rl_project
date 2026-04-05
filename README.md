@@ -51,6 +51,58 @@ MuJoCo 本地测试（宿主机手动流程）可参考：
 - `cd ~/.mujoco/mujoco210/bin`
 - `./simulate ../model/humanoid.xml`
 
+## 4) 持久化模型与挂载
+
+为什么要把 `checkpoints`、`logs`、`mjkey` 挂载到宿主机：
+
+- `checkpoints` 需要持久化，避免容器删除后模型丢失。
+- `logs` 需要长期保存，方便看 TensorBoard、排查训练曲线与恢复实验。
+- `mjkey.txt` 属于敏感文件，应该只保存在宿主机的 `~/.mujoco` 中，并以只读方式挂载进容器。
+
+推荐的宿主目录结构：
+
+- `/home/ubuntu/rl-data/checkpoints`
+- `/home/ubuntu/rl-data/logs`
+- `/home/ubuntu/.mujoco/mjkey.txt`
+
+推荐运行命令（与 [run_remote.sh](run_remote.sh) 保持一致）：
+
+```bash
+docker run --gpus all -it --rm \
+  -v /home/ubuntu/.mujoco:/root/.mujoco:ro \
+  -v /home/ubuntu/rl-data/checkpoints:/workspace/checkpoints \
+  -v /home/ubuntu/rl-data/logs:/workspace/logs \
+  --shm-size=4g \
+  -p 5901:5901 \
+  yourrepo/rl-vgl:latest
+```
+
+如果你更喜欢 compose，可以先导出 UID/GID，再启动：
+
+```bash
+export UID=$(id -u)
+export GID=$(id -g)
+docker compose up
+```
+
+对应示例见 [docker-compose.yml](docker-compose.yml)。
+
+权限问题与解决方法：
+
+- 如果容器里写出的文件在宿主机上是 root 拥有，建议用 `-u $(id -u):$(id -g)` 启动容器。
+- 如果目录已经创建为 root，可在宿主机执行：
+  - `chown -R $(id -u):$(id -g) /home/ubuntu/rl-data/checkpoints /home/ubuntu/rl-data/logs`
+
+VNC 安全访问方式：
+
+- 建议不要直接把 5901 暴露到公网。
+- 推荐 SSH 隧道：`ssh -N -L 5901:127.0.0.1:5901 <user>@<server_ip>`，然后本地 VNC 客户端连接 `127.0.0.1:5901`。
+
+备份与恢复建议：
+
+- 定期用 `rsync` 备份 `checkpoints` 和 `logs`。
+- 如果你有云存储，也可以同步到 S3 或对象存储，减少单机故障风险。
+
 ## 安全说明
 
 - 不要把 `mjkey.txt` 或任何私钥写入仓库或镜像。

@@ -1,0 +1,30 @@
+version: "3.8"
+
+# 这个示例用于把训练数据、日志与 MuJoCo 运行时目录从宿主机挂载到容器。
+# 安全建议：不要把 mjkey.txt 放进仓库；只在宿主机 ~/.mujoco 中保存，并以只读方式挂载进容器。
+# 说明：compose 文件里使用 ${HOME} 比直接写 ~ 更稳妥；效果等价于宿主机的 ~/.mujoco。
+# 如果你希望容器内写出的文件归当前宿主用户所有，可在启动前导出 UID/GID：
+#   export UID=$(id -u)
+#   export GID=$(id -g)
+
+services:
+  rl:
+    image: yourrepo/rl-vgl:latest
+    container_name: rl-vgl
+    # 可选：使用宿主 UID/GID 运行，减少权限问题。
+    # user: "${UID}:${GID}"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
+    shm_size: "4gb"
+    volumes:
+      # 保存训练 checkpoints，防止容器删除后模型丢失。
+      - ./checkpoints:/workspace/checkpoints
+      # 保存 tensorboard 和训练日志，便于恢复、调试与对比实验结果。
+      - ./logs:/workspace/logs
+      # 挂载 MuJoCo 目录，包含 mjkey.txt 和相关运行库；使用 :ro 提高安全性。
+      - ${HOME}/.mujoco:/root/.mujoco:ro
+    ports:
+      # VNC 仅作为示例，生产环境建议通过 SSH 隧道访问，避免直接暴露公网。
+      - "5901:5901"
+    command: ["/usr/local/bin/docker_entrypoint.sh"]

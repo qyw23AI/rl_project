@@ -129,6 +129,24 @@ RUN set -eux; \
 # - vncserver -depth 24：24-bit 色深在 OpenGL/VirtualGL 组合下通常更稳定，避免黑屏或渲染异常。
 # - 保持 LD_LIBRARY_PATH：减少 OpenGL、MuJoCo、CUDA 动态库加载失败风险。
 
+# 持久化与挂载说明：
+# - 不要把 mjkey.txt、模型文件、训练产物直接写入镜像；镜像应该保持可复现但尽量“无状态”。
+# - 运行时请通过 `-v` 把宿主机目录挂载到容器内，例如：
+#   -v /home/ubuntu/.mujoco:/root/.mujoco:ro
+#   -v /home/ubuntu/rl-data/checkpoints:/workspace/checkpoints
+#   -v /home/ubuntu/rl-data/logs:/workspace/logs
+# - 其中 `/root/.mujoco` 存放 MuJoCo license/key 与运行库；对 `mjkey.txt` 使用 `:ro` 只读挂载更安全。
+# - `/workspace/checkpoints` 用于保存模型权重，避免容器删除后丢失训练结果。
+# - `/workspace/logs` 用于保存 tensorboard 与训练日志，便于调试、对比和恢复。
+# - 推荐的运行命令模板请直接按下面示例替换宿主机路径和镜像名：
+#   docker run --gpus all -it --rm \
+#     -v /home/ubuntu/.mujoco:/root/.mujoco:ro \
+#     -v /home/ubuntu/rl-data/checkpoints:/workspace/checkpoints \
+#     -v /home/ubuntu/rl-data/logs:/workspace/logs \
+#     --shm-size=4g \
+#     -p 5901:5901 \
+#     yourrepo/rl-vgl:latest
+
 COPY docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
 RUN chmod +x /usr/local/bin/docker_entrypoint.sh
 
