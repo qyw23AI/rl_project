@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # 需要替换的占位符：
 # - REPO_URL: 你的 Git 仓库地址
 # - REPO_DIR: 服务器上的项目目录名
 # - IMAGE: 构建后的镜像名
 # - HOST_CHECKPOINT_DIR: 宿主机保存 checkpoints 的目录
 # - HOST_LOG_DIR: 宿主机保存 logs 的目录
-REPO_URL="${REPO_URL:-git@github.com/qyw23AI/rl_project}"
-REPO_DIR="${REPO_DIR:-rl-project}"
+REPO_URL="${REPO_URL:-git@github.com:qyw23AI/rl_project.git}"
+REPO_DIR="${REPO_DIR:-${SCRIPT_DIR}}"
 IMAGE="${IMAGE:-yourrepo/rl-vgl:latest}"
 HOST_CHECKPOINT_DIR="${HOST_CHECKPOINT_DIR:-${HOME}/rl-data/checkpoints}"
 HOST_LOG_DIR="${HOST_LOG_DIR:-${HOME}/rl-data/logs}"
@@ -29,9 +31,9 @@ git -C "${REPO_DIR}" submodule sync --recursive || true
 git -C "${REPO_DIR}" submodule update --init --recursive || true
 
 if [[ ! -f "${HOME}/.mujoco/mjkey.txt" ]]; then
-  echo "[error] Missing MuJoCo key: ${HOME}/.mujoco/mjkey.txt"
-  echo "        Please place the key on server host first, then re-run."
-  exit 1
+  echo "[warn] MuJoCo key not found: ${HOME}/.mujoco/mjkey.txt"
+  echo "       MuJoCo 2.1+ is typically license-free; continuing without mjkey."
+  echo "       If your workflow still requires it, place the key and re-run."
 fi
 
 mkdir -p "${HOST_CHECKPOINT_DIR}" "${HOST_LOG_DIR}"
