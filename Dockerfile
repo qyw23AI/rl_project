@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # 目标：在单容器内提供 Isaac Gym + MuJoCo + VirtualGL + TurboVNC 环境
-# 基础镜像固定为 CUDA 11.3 + Ubuntu 22.04，以兼容 torch 1.11.0+cu113。
-FROM nvidia/cuda:11.3.1-cudnn8-runtime-ubuntu22.04
+# 基础镜像固定为 CUDA 11.8 + Ubuntu 22.04，以兼容 torch 1.11.0+cu113。
+# 说明：nvidia/cuda:11.3.1-cudnn8-runtime-ubuntu22.04 不存在；11.8.0 22.04 组合可正常拉取。
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \

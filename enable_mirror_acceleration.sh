@@ -11,6 +11,7 @@ set -euo pipefail
 #   ENABLE_CONDA_MIRROR=1
 #   ENABLE_GIT_TUNING=1
 #   DOCKER_MIRRORS=https://hub-mirror.c.163.com,https://mirror.baidubce.com
+#   DOCKER_DAEMON_PROXY=http://127.0.0.1:17890
 
 if [[ $EUID -ne 0 ]]; then
   echo "[info] Re-running with sudo..."
@@ -28,6 +29,8 @@ ENABLE_PYTHON_MIRROR="${ENABLE_PYTHON_MIRROR:-1}"
 ENABLE_CONDA_MIRROR="${ENABLE_CONDA_MIRROR:-1}"
 ENABLE_GIT_TUNING="${ENABLE_GIT_TUNING:-1}"
 DOCKER_MIRRORS="${DOCKER_MIRRORS:-https://hub-mirror.c.163.com,https://mirror.baidubce.com}"
+DOCKER_DAEMON_PROXY="${DOCKER_DAEMON_PROXY:-${HTTP_PROXY:-${http_proxy:-}}}"
+DOCKER_DAEMON_NO_PROXY="${DOCKER_DAEMON_NO_PROXY:-${NO_PROXY:-${no_proxy:-localhost,127.0.0.1}}}"
 
 TARGET_USER="${SUDO_USER:-${USER:-ubuntu}}"
 USER_HOME="$(getent passwd "${TARGET_USER}" | cut -d: -f6)"
@@ -118,6 +121,24 @@ PY
   if command -v systemctl >/dev/null 2>&1; then
     systemctl restart docker || true
   fi
+fi
+
+if [[ -n "${DOCKER_DAEMON_PROXY}" ]]; then
+  echo "[step] Configuring Docker daemon proxy..."
+  install -m 0755 -d /etc/systemd/system/docker.service.d
+  cat >/etc/systemd/system/docker.service.d/http-proxy.conf <<EOF
+[Service]
+Environment="HTTP_PROXY=${DOCKER_DAEMON_PROXY}"
+Environment="HTTPS_PROXY=${DOCKER_DAEMON_PROXY}"
+Environment="NO_PROXY=${DOCKER_DAEMON_NO_PROXY}"
+EOF
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload || true
+    systemctl restart docker || true
+  fi
+  echo "[info] Docker daemon proxy set to: ${DOCKER_DAEMON_PROXY}"
+else
+  echo "[step] Docker daemon proxy not set (DOCKER_DAEMON_PROXY/HTTP_PROXY empty)."
 fi
 
 if [[ "${ENABLE_PYTHON_MIRROR}" == "1" ]]; then

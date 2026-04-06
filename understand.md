@@ -23,7 +23,7 @@
 ### 1.1 基础镜像
 
 - 入口： [Dockerfile](Dockerfile#L4)
-- 含义：用 NVIDIA 官方 CUDA 11.3 + Ubuntu 22.04 作为基础，保证与 `torch==1.11.0+cu113` 对齐。
+- 含义：用 NVIDIA 官方 CUDA 11.8 + Ubuntu 22.04 作为基础，保留你要求的 22.04，同时使用一个 Docker Hub 上可正常拉取的组合。
 
 ### 1.2 环境变量
 

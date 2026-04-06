@@ -34,6 +34,7 @@ require_cmd git "Please install git first."
 require_cmd wget "Please install wget first."
 require_cmd tar "Please install tar first."
 require_cmd docker "Please install Docker Engine and ensure 'docker' is in PATH."
+require_cmd timeout "Please install coreutils timeout command."
 
 if [[ -d "${REPO_DIR}/.git" ]]; then
   echo "[sync] Repo exists. Pulling latest changes..."
@@ -68,6 +69,14 @@ if [[ ! -d "${MUJOCO_DIR}/mujoco210" ]]; then
 fi
 
 cd "${REPO_DIR}"
+
+echo "[preflight] Checking Docker Hub reachability (registry-1.docker.io:443)..."
+if ! timeout 8 bash -lc 'cat < /dev/null > /dev/tcp/registry-1.docker.io/443' 2>/dev/null; then
+  echo "[error] Docker Hub unreachable from Docker host network."
+  echo "        Set Docker daemon proxy first, then retry:"
+  echo "        DOCKER_DAEMON_PROXY=http://127.0.0.1:17890 sudo -E bash ./enable_mirror_acceleration.sh"
+  exit 1
+fi
 
 echo "[build] Building Docker image: ${IMAGE}"
 if [[ "${DOCKER_BUILDKIT_MODE}" == "0" ]]; then

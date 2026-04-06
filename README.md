@@ -14,6 +14,7 @@
   - `numpy==1.23.2` `h5py_cache` `opencv-python`
   - `tensorboard` `onnxruntime` `mujoco-python-viewer` `scipy` `gym` `mujoco-py`
 - 镜像中通过 `python3-pip` 安装 pip，并配置清华镜像源。
+- 当前镜像基座已调整为 `nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04`，以保留 Ubuntu 22.04，同时使用可正常拉取的 CUDA 22.04 组合。
 
 ## 2) Isaac Gym 安装与验证
 

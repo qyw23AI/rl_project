@@ -4,14 +4,19 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 用法:
-  SSH_TARGET=user@server_ip [LOCAL_PROXY_HOST=127.0.0.1] [LOCAL_PROXY_PORT=7890] [REMOTE_PROXY_PORT=17890] ./proxy_forward.sh
+  方式1（推荐）:
+    ./proxy_forward.sh user@server_ip
+
+  方式2（环境变量）:
+    SSH_TARGET=user@server_ip [LOCAL_PROXY_HOST=127.0.0.1] [LOCAL_PROXY_PORT=7897] [REMOTE_PROXY_PORT=17890] ./proxy_forward.sh
 
 说明:
   这个脚本应在你本机运行，用 SSH 反向转发把本机代理暴露到远端服务器。
   远端随后可以把 HTTP_PROXY/HTTPS_PROXY 指向 http://127.0.0.1:REMOTE_PROXY_PORT。
 
 示例:
-  SSH_TARGET=ubuntu@10.60.20.189 LOCAL_PROXY_PORT=7890 ./proxy_forward.sh
+  ./proxy_forward.sh ubuntu@117.50.33.166
+  SSH_TARGET=ubuntu@117.50.33.166 LOCAL_PROXY_PORT=7897 ./proxy_forward.sh
 EOF
 }
 
@@ -20,14 +25,20 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-SSH_TARGET="${SSH_TARGET:-}"
+SSH_TARGET="${SSH_TARGET:-${1:-}}"
 LOCAL_PROXY_HOST="${LOCAL_PROXY_HOST:-127.0.0.1}"
-LOCAL_PROXY_PORT="${LOCAL_PROXY_PORT:-7890}"
+LOCAL_PROXY_PORT="${LOCAL_PROXY_PORT:-7897}"
 REMOTE_PROXY_PORT="${REMOTE_PROXY_PORT:-17890}"
 SSH_OPTIONS="${SSH_OPTIONS:-}"
 
 if [[ -z "${SSH_TARGET}" ]]; then
-  echo "[error] Missing SSH_TARGET, for example: SSH_TARGET=ubuntu@10.60.20.189"
+  if [[ -t 0 ]]; then
+    read -r -p "[input] Enter SSH target (e.g. ubuntu@117.50.33.166): " SSH_TARGET
+  fi
+fi
+
+if [[ -z "${SSH_TARGET}" ]]; then
+  echo "[error] Missing SSH_TARGET, for example: SSH_TARGET=ubuntu@117.50.33.166"
   exit 1
 fi
 
