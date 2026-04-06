@@ -26,6 +26,7 @@ ENABLE_DOCKER_MIRROR="${ENABLE_DOCKER_MIRROR:-1}"
 ENABLE_PYTHON_MIRROR="${ENABLE_PYTHON_MIRROR:-1}"
 ENABLE_CONDA_MIRROR="${ENABLE_CONDA_MIRROR:-1}"
 ENABLE_GIT_TUNING="${ENABLE_GIT_TUNING:-1}"
+DOCKER_MIRRORS="${DOCKER_MIRRORS:-https://hub-mirror.c.163.com,https://mirror.baidubce.com}"
 
 TARGET_USER="${SUDO_USER:-${USER:-ubuntu}}"
 USER_HOME="$(getent passwd "${TARGET_USER}" | cut -d: -f6)"
@@ -70,12 +71,13 @@ if os.path.exists(path):
         except Exception:
             cfg = {}
 
-mirrors = [
-    'https://docker.m.daocloud.io',
-    'https://dockerproxy.com',
-    'https://hub-mirror.c.163.com',
-    'https://mirror.baidubce.com'
-]
+  raw = os.environ.get('DOCKER_MIRRORS', '').strip()
+  mirrors = [m.strip() for m in raw.split(',') if m.strip()]
+  if not mirrors:
+    mirrors = [
+      'https://hub-mirror.c.163.com',
+      'https://mirror.baidubce.com'
+    ]
 cfg['registry-mirrors'] = mirrors
 cfg.setdefault('max-concurrent-downloads', 10)
 cfg.setdefault('max-concurrent-uploads', 5)
