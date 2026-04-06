@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # - HOST_LOG_DIR: 宿主机保存 logs 的目录
 REPO_URL="${REPO_URL:-git@github.com:qyw23AI/rl_project.git}"
 REPO_DIR="${REPO_DIR:-${SCRIPT_DIR}}"
-IMAGE="${IMAGE:-yourrepo/rl-vgl:latest}"
+IMAGE="${IMAGE:-rl-vgl:latest}"
 HOST_CHECKPOINT_DIR="${HOST_CHECKPOINT_DIR:-${HOME}/rl-data/checkpoints}"
 HOST_LOG_DIR="${HOST_LOG_DIR:-${HOME}/rl-data/logs}"
 MUJOCO_DIR="${HOME}/.mujoco"
