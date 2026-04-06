@@ -40,7 +40,7 @@
 ## 3) MuJoCo 安装与验证
 
 - [run_remote.sh](run_remote.sh) 已包含：
-  - 检查 `~/.mujoco/mjkey.txt` 是否存在（不存在直接退出）
+  - 检查 `~/.mujoco/mjkey.txt` 是否存在（不存在会 warning 并继续）
   - 按需下载并解压 `mujoco210-linux-x86_64.tar.gz` 到 `~/.mujoco`
 - 容器运行时会挂载 `~/.mujoco:/root/.mujoco:ro`。
 - 若需要手动设置：
@@ -138,6 +138,98 @@ VNC 安全访问方式：
 - 服务器上再导出：`HTTP_PROXY=http://127.0.0.1:17890`、`HTTPS_PROXY=http://127.0.0.1:17890`。
 - 例子：`SSH_TARGET=ubuntu@10.60.20.189 LOCAL_PROXY_PORT=7890 ./proxy_forward.sh`
 - 然后在服务器里先 `export HTTP_PROXY=http://127.0.0.1:17890`，再执行 `./run_remote.sh`
+
+## 6) 服务器网络加速（推荐先执行）
+
+如果服务器下载很慢，先执行一键加速脚本 [enable_mirror_acceleration.sh](enable_mirror_acceleration.sh)：
+
+- `sudo bash ./enable_mirror_acceleration.sh`
+
+脚本会尽可能配置以下加速项：
+
+- APT：切换 TUNA 镜像源并启用重试/超时参数
+- Docker：配置 registry mirrors（保留已有 NVIDIA runtime 配置）
+- pip：配置清华源、超时与重试
+- conda：配置清华镜像 channels
+- git：调优慢网参数（降低超时中断概率）
+
+推荐顺序：
+
+1. 本机开代理并运行 [proxy_forward.sh](proxy_forward.sh)
+2. 服务器执行 `export HTTP_PROXY=http://127.0.0.1:17890` 与 `export HTTPS_PROXY=http://127.0.0.1:17890`
+3. 服务器执行 `sudo bash ./enable_mirror_acceleration.sh`
+4. 服务器执行 `./run_remote.sh`
+
+## 7) 一键全流程（推荐执行顺序）
+
+下面是当前仓库的完整实操顺序（本机 + 服务器）：
+
+1. 服务器安装 Docker 与 GPU runtime：
+  - `sudo bash ./install_docker_gpu.sh`
+2. （可选）本机打开代理转发到服务器：
+  - `SSH_TARGET=<user>@<server_ip> LOCAL_PROXY_PORT=7890 ./proxy_forward.sh`
+3. 服务器导出代理环境变量（如使用转发）：
+  - `export HTTP_PROXY=http://127.0.0.1:17890`
+  - `export HTTPS_PROXY=http://127.0.0.1:17890`
+4. 服务器配置镜像加速：
+  - `sudo bash ./enable_mirror_acceleration.sh`
+5. 服务器执行一键构建与运行：
+  - `./run_remote.sh`
+6. 本机通过 SSH 隧道访问 VNC：
+  - `ssh -N -L 5901:127.0.0.1:5901 <user>@<server_ip>`
+
+## 8) 脚本职责总览
+
+- [install_docker_gpu.sh](install_docker_gpu.sh)
+  - 安装 Docker Engine、Compose 插件、NVIDIA Container Toolkit
+  - 配置 Docker GPU runtime
+- [enable_mirror_acceleration.sh](enable_mirror_acceleration.sh)
+  - 配置 APT / Docker / pip / conda / git 慢网优化
+- [proxy_forward.sh](proxy_forward.sh)
+  - 在本机创建 SSH 反向转发，把本机代理暴露给服务器
+- [run_remote.sh](run_remote.sh)
+  - 同步代码和子模块、下载 MuJoCo runtime、构建镜像并启动容器
+  - 默认使用 `DOCKER_BUILDKIT=0` 规避 `docker/dockerfile:1` 拉取超时
+- [build_and_push.sh](build_and_push.sh)
+  - 本地构建、GPU 快测、打 tag 并推送镜像
+
+## 9) 常见报错与定位
+
+1. `docker: command not found`
+  - 原因：服务器未安装 Docker 或未在 PATH
+  - 处理：执行 [install_docker_gpu.sh](install_docker_gpu.sh)
+
+2. `failed to resolve source metadata for docker.io/docker/dockerfile:1: ... i/o timeout`
+  - 原因：到 Docker Hub 网络超时（BuildKit 前端镜像拉取失败）
+  - 处理：
+    - 先跑 [enable_mirror_acceleration.sh](enable_mirror_acceleration.sh)
+    - 使用 [proxy_forward.sh](proxy_forward.sh) + `HTTP_PROXY/HTTPS_PROXY`
+    - 当前 [run_remote.sh](run_remote.sh) 已默认回退到 legacy builder
+
+3. 子模块拉取慢或中断
+  - 原因：跨境网络抖动
+  - 处理：
+    - 保持代理开启
+    - 重新执行 `./run_remote.sh`（已启用子模块并行拉取）
+
+4. 容器启动后 MuJoCo 相关报错
+  - 原因：`~/.mujoco` 未挂载或运行库未下载完整
+  - 处理：确认 `-v ${HOME}/.mujoco:/root/.mujoco:ro`，并检查 `~/.mujoco/mujoco210`
+
+5. 宿主机目录权限问题（checkpoints/logs 无法写入）
+  - 原因：容器用户与宿主目录属主不一致
+  - 处理：
+    - 使用 `-u $(id -u):$(id -g)`（已在 [run_remote.sh](run_remote.sh) 默认启用）
+    - 宿主机执行 `chown -R $(id -u):$(id -g) /home/ubuntu/rl-data/checkpoints /home/ubuntu/rl-data/logs`
+
+## 10) 验证清单（一次性验收）
+
+- `docker --version` 正常
+- `docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi` 正常
+- `./run_remote.sh` 构建并启动成功
+- 进入容器后：
+  - `conda run -n rl python -c 'import isaacgym; print("isaacgym ok")'`
+  - `conda run -n rl python ./IsaacGymEnvs/isaacgymenvs/train.py task=Cartpole`
 
 ## 安全说明
 

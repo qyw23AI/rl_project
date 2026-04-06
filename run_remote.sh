@@ -17,6 +17,8 @@ HOST_LOG_DIR="${HOST_LOG_DIR:-${HOME}/rl-data/logs}"
 MUJOCO_DIR="${HOME}/.mujoco"
 MUJOCO_TAR="mujoco210-linux-x86_64.tar.gz"
 MUJOCO_URL="https://mujoco.org/download/${MUJOCO_TAR}"
+DOCKER_BUILDKIT_MODE="${DOCKER_BUILDKIT_MODE:-0}"
+GIT_JOBS="${GIT_JOBS:-8}"
 
 require_cmd() {
   local cmd="$1"
@@ -43,7 +45,7 @@ fi
  
 echo "[sync] Initializing/updating git submodules (if configured)..."
 git -C "${REPO_DIR}" submodule sync --recursive || true
-git -C "${REPO_DIR}" submodule update --init --recursive || true
+git -C "${REPO_DIR}" submodule update --init --recursive --jobs "${GIT_JOBS}" || true
 
 if [[ ! -f "${HOME}/.mujoco/mjkey.txt" ]]; then
   echo "[warn] MuJoCo key not found: ${HOME}/.mujoco/mjkey.txt"
@@ -61,14 +63,20 @@ mkdir -p "${HOST_CHECKPOINT_DIR}" "${HOST_LOG_DIR}"
 mkdir -p "${MUJOCO_DIR}"
 if [[ ! -d "${MUJOCO_DIR}/mujoco210" ]]; then
   echo "[mujoco] Downloading MuJoCo 2.1.0 runtime..."
-  wget -O "${MUJOCO_DIR}/${MUJOCO_TAR}" "${MUJOCO_URL}"
+  wget --tries=5 --waitretry=2 --timeout=30 -c -O "${MUJOCO_DIR}/${MUJOCO_TAR}" "${MUJOCO_URL}"
   tar -zxvf "${MUJOCO_DIR}/${MUJOCO_TAR}" -C "${MUJOCO_DIR}"
 fi
 
 cd "${REPO_DIR}"
 
 echo "[build] Building Docker image: ${IMAGE}"
-docker build -t "${IMAGE}" .
+if [[ "${DOCKER_BUILDKIT_MODE}" == "0" ]]; then
+  echo "[build] Using legacy builder (DOCKER_BUILDKIT=0) to avoid docker/dockerfile frontend pull timeout."
+  DOCKER_BUILDKIT=0 docker build -t "${IMAGE}" .
+else
+  echo "[build] Using BuildKit (DOCKER_BUILDKIT=1)."
+  DOCKER_BUILDKIT=1 docker build -t "${IMAGE}" .
+fi
 
 echo "[run] Starting container with GPU + MuJoCo mount + enlarged /dev/shm..."
 # 安全提示：

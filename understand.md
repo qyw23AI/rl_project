@@ -135,23 +135,19 @@
 
 ---
 
-## 5. 服务器一键部署脚本怎么读
+## 5. 服务器一键部署脚本怎么读（最新版）
 
 看 [run_remote.sh](run_remote.sh)：
 
 1. 拉取代码（存在就 `pull`，不存在就 `clone`）
-   - [run_remote.sh](run_remote.sh#L17-L20)
-2. 检查 MuJoCo 密钥
-   - [run_remote.sh](run_remote.sh#L23-L27)
-3. 按需下载 MuJoCo 2.1.0
-   - [run_remote.sh](run_remote.sh#L31-L35)
-4. 构建镜像
-   - [run_remote.sh](run_remote.sh#L40)
-5. 启动容器（含 GPU、`--shm-size=4g`、挂载 `~/.mujoco`、本地回环端口）
-   - [run_remote.sh](run_remote.sh#L46-L51)
-6. 给出验证命令
-   - `import isaacgym`： [run_remote.sh](run_remote.sh#L58)
-   - Cartpole 训练： [run_remote.sh](run_remote.sh#L60)
+2. 同步并更新子模块（含并行 jobs）
+3. 检查 MuJoCo key（缺失时 warning，不中断流程）
+4. 按需下载 MuJoCo 2.1.0（带重试、超时、断点续传）
+5. 构建镜像（默认 `DOCKER_BUILDKIT=0`，用于规避慢网下 `docker/dockerfile:1` 拉取超时）
+6. 启动容器（GPU、`--shm-size=4g`、挂载 `~/.mujoco`、`checkpoints/logs` 持久化、用户映射）
+7. 输出 SSH 隧道与训练验证命令
+
+补充：如果你明确需要 BuildKit，可运行前设置 `DOCKER_BUILDKIT_MODE=1`。
 
 ---
 
@@ -191,3 +187,83 @@
 6. MuJoCo 示例可启动
 
 如果你希望，我可以继续为你做“第二版”：在每个脚本中再加入更细粒度行内注释（逐命令解释），并保持与当前逻辑完全一致。
+
+---
+
+## 9. 从零到可训练：完整执行手册（可复制）
+
+### 阶段 A：服务器基础能力
+
+1. 安装 Docker + GPU runtime：
+   - `sudo bash ./install_docker_gpu.sh`
+2. 重新登录 SSH（让 docker group 生效）
+3. 验证：
+   - `docker --version`
+   - `docker compose version`
+   - `docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi`
+
+### 阶段 B：网络加速（强烈建议）
+
+1. 服务器执行：
+   - `sudo bash ./enable_mirror_acceleration.sh`
+2. 若仍慢，使用本机代理转发：
+   - 本机执行：`SSH_TARGET=<user>@<server_ip> LOCAL_PROXY_PORT=7890 ./proxy_forward.sh`
+   - 服务器执行：
+     - `export HTTP_PROXY=http://127.0.0.1:17890`
+     - `export HTTPS_PROXY=http://127.0.0.1:17890`
+
+### 阶段 C：一键构建运行
+
+1. 服务器执行：`./run_remote.sh`
+2. 若成功，会得到 VNC 隧道提示
+3. 本机执行：`ssh -N -L 5901:127.0.0.1:5901 <user>@<server_ip>`
+
+### 阶段 D：容器内验证训练
+
+1. `conda run -n rl python -c 'import isaacgym; print("isaacgym ok")'`
+2. `conda run -n rl python ./IsaacGymEnvs/isaacgymenvs/train.py task=Cartpole`
+
+---
+
+## 10. 关键报错速查表
+
+### 报错 A：`docker: command not found`
+
+- 结论：Docker 未安装或会话未生效
+- 处理：执行 [install_docker_gpu.sh](install_docker_gpu.sh)，然后重新登录 SSH
+
+### 报错 B：`failed to resolve source metadata for docker.io/docker/dockerfile:1 ... i/o timeout`
+
+- 结论：到 Docker Hub 的网络超时（常见于慢网/未代理）
+- 处理：
+  1. 跑 [enable_mirror_acceleration.sh](enable_mirror_acceleration.sh)
+  2. 开启 [proxy_forward.sh](proxy_forward.sh)
+  3. 确认服务器已导出 `HTTP_PROXY/HTTPS_PROXY`
+  4. 重新执行 [run_remote.sh](run_remote.sh)
+
+### 报错 C：子模块下载超时
+
+- 结论：Git 线路不稳
+- 处理：代理 + 重试，`run_remote.sh` 已支持并行子模块更新
+
+### 报错 D：容器里无法写 checkpoints/logs
+
+- 结论：目录属主与容器用户不一致
+- 处理：使用 `-u $(id -u):$(id -g)`（默认已启用）并在宿主机 `chown`
+
+### 报错 E：MuJoCo 运行库找不到
+
+- 结论：`~/.mujoco` 未挂载或 `mujoco210` 不完整
+- 处理：检查挂载与 `~/.mujoco/mujoco210/bin` 是否存在
+
+---
+
+## 11. 现在仓库里每个脚本的定位
+
+- [run_remote.sh](run_remote.sh)：远端一键同步 + 构建 + 运行
+- [install_docker_gpu.sh](install_docker_gpu.sh)：Docker + NVIDIA runtime 安装
+- [enable_mirror_acceleration.sh](enable_mirror_acceleration.sh)：国内网络加速与镜像配置
+- [proxy_forward.sh](proxy_forward.sh)：本机代理转发到远端
+- [build_and_push.sh](build_and_push.sh)：本地构建并推送镜像
+
+你按“阶段 A→B→C→D”执行，就能稳定完成全流程。
