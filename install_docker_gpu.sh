@@ -22,7 +22,9 @@ apt-get install -y ca-certificates curl gnupg lsb-release apt-transport-https
 
 echo "[step] Adding Docker official repository..."
 install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+install -m 0755 -d /etc/apt/sources.list.d
+rm -f /etc/apt/keyrings/docker.gpg /etc/apt/sources.list.d/docker.list
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable" \
@@ -41,7 +43,9 @@ usermod -aG docker "${USERNAME}"
 
 echo "[step] Installing NVIDIA Container Toolkit..."
 install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /etc/apt/keyrings/nvidia-container-toolkit.gpg
+install -m 0755 -d /etc/apt/sources.list.d
+rm -f /etc/apt/keyrings/nvidia-container-toolkit.gpg /etc/apt/sources.list.d/nvidia-container-toolkit.list
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor --yes -o /etc/apt/keyrings/nvidia-container-toolkit.gpg
 chmod a+r /etc/apt/keyrings/nvidia-container-toolkit.gpg
 distribution="$(source /etc/os-release && echo ${ID}${VERSION_ID})"
 curl -fsSL "https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list" \

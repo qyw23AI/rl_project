@@ -131,6 +131,14 @@ VNC 安全访问方式：
 
 如果你本机开了 VPN/代理，也可以用 SSH 端口转发把代理端口转到服务器，再让上面的环境变量指向本地转发端口。
 
+一键转发脚本见 [proxy_forward.sh](proxy_forward.sh)：
+
+- 在你电脑本机运行它，不是在服务器上运行。
+- 它会把你本机的代理端口通过 SSH 反向转发到服务器上的 `127.0.0.1:17890`。
+- 服务器上再导出：`HTTP_PROXY=http://127.0.0.1:17890`、`HTTPS_PROXY=http://127.0.0.1:17890`。
+- 例子：`SSH_TARGET=ubuntu@10.60.20.189 LOCAL_PROXY_PORT=7890 ./proxy_forward.sh`
+- 然后在服务器里先 `export HTTP_PROXY=http://127.0.0.1:17890`，再执行 `./run_remote.sh`
+
 ## 安全说明
 
 - 不要把 `mjkey.txt` 或任何私钥写入仓库或镜像。
