@@ -10,6 +10,7 @@ set -euo pipefail
 #   ENABLE_PYTHON_MIRROR=1
 #   ENABLE_CONDA_MIRROR=1
 #   ENABLE_GIT_TUNING=1
+#   DOCKER_MIRRORS=https://hub-mirror.c.163.com,https://mirror.baidubce.com
 
 if [[ $EUID -ne 0 ]]; then
   echo "[info] Re-running with sudo..."
@@ -71,13 +72,21 @@ if os.path.exists(path):
         except Exception:
             cfg = {}
 
-  raw = os.environ.get('DOCKER_MIRRORS', '').strip()
-  mirrors = [m.strip() for m in raw.split(',') if m.strip()]
-  if not mirrors:
-    mirrors = [
-      'https://hub-mirror.c.163.com',
-      'https://mirror.baidubce.com'
-    ]
+    raw = os.environ.get('DOCKER_MIRRORS', '').strip()
+    mirrors = [m.strip() for m in raw.split(',') if m.strip()]
+    if not mirrors:
+      mirrors = [
+        'https://hub-mirror.c.163.com',
+        'https://mirror.baidubce.com'
+      ]
+
+    # 过滤已知容易返回 403 的镜像源
+    bad = {
+      'https://docker.m.daocloud.io',
+      'https://dockerproxy.com'
+    }
+    mirrors = [m for m in mirrors if m not in bad]
+
 cfg['registry-mirrors'] = mirrors
 cfg.setdefault('max-concurrent-downloads', 10)
 cfg.setdefault('max-concurrent-uploads', 5)
