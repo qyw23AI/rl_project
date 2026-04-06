@@ -18,6 +18,21 @@ MUJOCO_DIR="${HOME}/.mujoco"
 MUJOCO_TAR="mujoco210-linux-x86_64.tar.gz"
 MUJOCO_URL="https://mujoco.org/download/${MUJOCO_TAR}"
 
+require_cmd() {
+  local cmd="$1"
+  local hint="$2"
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "[error] Missing command: ${cmd}"
+    echo "        ${hint}"
+    exit 1
+  fi
+}
+
+require_cmd git "Please install git first."
+require_cmd wget "Please install wget first."
+require_cmd tar "Please install tar first."
+require_cmd docker "Please install Docker Engine and ensure 'docker' is in PATH."
+
 if [[ -d "${REPO_DIR}/.git" ]]; then
   echo "[sync] Repo exists. Pulling latest changes..."
   git -C "${REPO_DIR}" pull --rebase

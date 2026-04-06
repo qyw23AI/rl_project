@@ -103,6 +103,34 @@ VNC 安全访问方式：
 - 定期用 `rsync` 备份 `checkpoints` 和 `logs`。
 - 如果你有云存储，也可以同步到 S3 或对象存储，减少单机故障风险。
 
+## 5) Docker 与 GPU 环境安装
+
+如果远端服务器还没有 Docker，先运行仓库里的安装脚本：
+
+- `sudo bash ./install_docker_gpu.sh`
+
+这个脚本会自动完成：
+
+- 安装 Docker Engine、Docker Compose 插件和 containerd
+- 配置 Docker 官方源
+- 安装 NVIDIA Container Toolkit
+- 执行 `nvidia-ctk runtime configure --runtime=docker`
+- 重启 Docker 并做基础验证
+
+安装后请重新登录 SSH 会话，让 `docker` 用户组权限生效，然后检查：
+
+- `docker --version`
+- `docker compose version`
+- `docker run --rm --gpus all nvidia/cuda:12.2.0-base-ubuntu22.04 nvidia-smi`
+
+如果你在国内网络环境下拉包较慢，可以先在远端设置代理，再执行 `./run_remote.sh`：
+
+- `export HTTP_PROXY=http://127.0.0.1:7890`
+- `export HTTPS_PROXY=http://127.0.0.1:7890`
+- `export NO_PROXY=localhost,127.0.0.1,127.0.0.1`
+
+如果你本机开了 VPN/代理，也可以用 SSH 端口转发把代理端口转到服务器，再让上面的环境变量指向本地转发端口。
+
 ## 安全说明
 
 - 不要把 `mjkey.txt` 或任何私钥写入仓库或镜像。
