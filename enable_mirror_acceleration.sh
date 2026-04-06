@@ -63,6 +63,9 @@ if [[ "${ENABLE_DOCKER_MIRROR}" == "1" ]]; then
   # 通过 Python 合并 daemon.json，避免覆盖 nvidia-ctk 已写入的 runtime 配置。
   python3 - <<'PY'
 import json, os
+import socket
+from urllib.parse import urlparse
+
 path = '/etc/docker/daemon.json'
 cfg = {}
 if os.path.exists(path):
@@ -87,7 +90,23 @@ if os.path.exists(path):
     }
     mirrors = [m for m in mirrors if m not in bad]
 
-cfg['registry-mirrors'] = mirrors
+    def host_resolvable(url: str) -> bool:
+      try:
+        host = urlparse(url).hostname
+        if not host:
+          return False
+        socket.getaddrinfo(host, 443)
+        return True
+      except Exception:
+        return False
+
+    reachable = [m for m in mirrors if host_resolvable(m)]
+
+    if reachable:
+      cfg['registry-mirrors'] = reachable
+    else:
+      cfg.pop('registry-mirrors', None)
+
 cfg.setdefault('max-concurrent-downloads', 10)
 cfg.setdefault('max-concurrent-uploads', 5)
 
