@@ -18,6 +18,7 @@ MUJOCO_DIR="${HOME}/.mujoco"
 MUJOCO_TAR="mujoco210-linux-x86_64.tar.gz"
 MUJOCO_URL="https://mujoco.org/download/${MUJOCO_TAR}"
 DOCKER_BUILDKIT_MODE="${DOCKER_BUILDKIT_MODE:-0}"
+DOCKER_BUILD_PROGRESS="${DOCKER_BUILD_PROGRESS:-plain}"
 GIT_JOBS="${GIT_JOBS:-8}"
 
 require_cmd() {
@@ -80,10 +81,11 @@ fi
 echo "[build] Building Docker image: ${IMAGE}"
 if [[ "${DOCKER_BUILDKIT_MODE}" == "0" ]]; then
   echo "[build] Using legacy builder (DOCKER_BUILDKIT=0) to avoid docker/dockerfile frontend pull timeout."
+  echo "[build] Tip: set DOCKER_BUILDKIT_MODE=1 to get detailed streaming logs."
   DOCKER_BUILDKIT=0 docker build -t "${IMAGE}" .
 else
-  echo "[build] Using BuildKit (DOCKER_BUILDKIT=1)."
-  DOCKER_BUILDKIT=1 docker build -t "${IMAGE}" .
+  echo "[build] Using BuildKit (DOCKER_BUILDKIT=1, --progress=${DOCKER_BUILD_PROGRESS})."
+  DOCKER_BUILDKIT=1 docker build --progress="${DOCKER_BUILD_PROGRESS}" -t "${IMAGE}" .
 fi
 
 echo "[run] Starting container with GPU + MuJoCo mount + enlarged /dev/shm..."
