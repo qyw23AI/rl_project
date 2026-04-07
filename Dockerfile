@@ -52,8 +52,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ARG VGL_VERSION=3.1.1
 ARG TVNC_VERSION=3.1.2
 RUN set -eux; \
-    wget -O /tmp/virtualgl.deb "https://sourceforge.net/projects/virtualgl/files/${VGL_VERSION}/virtualgl_${VGL_VERSION}_amd64.deb/download"; \
-    wget -O /tmp/turbovnc.deb "https://sourceforge.net/projects/turbovnc/files/${TVNC_VERSION}/turbovnc_${TVNC_VERSION}_amd64.deb/download"; \
+    wget -O /tmp/virtualgl.deb "https://github.com/VirtualGL/virtualgl/releases/download/${VGL_VERSION}/virtualgl_${VGL_VERSION}_amd64.deb"; \
+    wget -O /tmp/turbovnc.deb "https://github.com/TurboVNC/turbovnc/releases/download/${TVNC_VERSION}/turbovnc_${TVNC_VERSION}_amd64.deb"; \
     apt-get update; \
     apt-get install -y /tmp/virtualgl.deb /tmp/turbovnc.deb; \
     rm -f /tmp/virtualgl.deb /tmp/turbovnc.deb; \
