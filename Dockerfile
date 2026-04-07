@@ -90,7 +90,9 @@ RUN conda run -n rl python -m pip install --upgrade pip && \
         # 注意：torch/torchvision 的 cu113 轮子仍通过 requirements.txt 顶部的 -f 源解析。
     conda run -n rl python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     conda run -n rl python -m pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn && \
-    conda run -n rl python -m pip install --no-cache-dir -r /workspace/requirements.txt
+    echo "[pip] start installing requirements (this can take a while for torch wheels)" && \
+    conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 -v -r /workspace/requirements.txt && \
+    echo "[pip] requirements installation finished"
 
 # 关于你给出的 conda pytorch 命令说明：
 # - 你给的示例是：conda install pytorch torchvision pytorch-cuda=12.1.0 -c pytorch -c nvidia
