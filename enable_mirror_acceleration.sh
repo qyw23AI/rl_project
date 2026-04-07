@@ -11,7 +11,7 @@ set -euo pipefail
 #   ENABLE_CONDA_MIRROR=1
 #   ENABLE_GIT_TUNING=1
 #   DOCKER_MIRRORS=https://hub-mirror.c.163.com,https://mirror.baidubce.com
-#   DOCKER_DAEMON_PROXY=http://127.0.0.1:17890
+#   DOCKER_DAEMON_PROXY=http://127.0.0.1:7897
 
 if [[ $EUID -ne 0 ]]; then
   echo "[info] Re-running with sudo..."
@@ -78,37 +78,41 @@ if os.path.exists(path):
         except Exception:
             cfg = {}
 
-    raw = os.environ.get('DOCKER_MIRRORS', '').strip()
-    mirrors = [m.strip() for m in raw.split(',') if m.strip()]
-    if not mirrors:
-      mirrors = [
+raw = os.environ.get('DOCKER_MIRRORS', '').strip()
+mirrors = [m.strip() for m in raw.split(',') if m.strip()]
+if not mirrors:
+    mirrors = [
         'https://hub-mirror.c.163.com',
         'https://mirror.baidubce.com'
-      ]
+    ]
 
-    # 过滤已知容易返回 403 的镜像源
-    bad = {
-      'https://docker.m.daocloud.io',
-      'https://dockerproxy.com'
-    }
-    mirrors = [m for m in mirrors if m not in bad]
+# 过滤已知容易返回 403 的镜像源
+bad = {
+    'https://docker.m.daocloud.io',
+    'https://dockerproxy.com'
+}
+mirrors = [m for m in mirrors if m not in bad]
 
-    def host_resolvable(url: str) -> bool:
-      try:
+def host_resolvable(url: str) -> bool:
+    try:
         host = urlparse(url).hostname
         if not host:
-          return False
+            return False
         socket.getaddrinfo(host, 443)
         return True
-      except Exception:
+    except Exception:
         return False
 
-    reachable = [m for m in mirrors if host_resolvable(m)]
+reachable = [m for m in mirrors if host_resolvable(m)]
+proxy = (os.environ.get('DOCKER_DAEMON_PROXY') or '').strip()
 
-    if reachable:
-      cfg['registry-mirrors'] = reachable
-    else:
-      cfg.pop('registry-mirrors', None)
+# 如果配置了 daemon 代理，优先走 Docker Hub + 代理，避免镜像站干扰。
+if proxy:
+    cfg.pop('registry-mirrors', None)
+elif reachable:
+    cfg['registry-mirrors'] = reachable
+else:
+    cfg.pop('registry-mirrors', None)
 
 cfg.setdefault('max-concurrent-downloads', 10)
 cfg.setdefault('max-concurrent-uploads', 5)
@@ -135,6 +139,7 @@ EOF
   if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload || true
     systemctl restart docker || true
+    systemctl show docker -p Environment || true
   fi
   echo "[info] Docker daemon proxy set to: ${DOCKER_DAEMON_PROXY}"
 else

@@ -72,10 +72,9 @@ cd "${REPO_DIR}"
 
 echo "[preflight] Checking Docker Hub reachability (registry-1.docker.io:443)..."
 if ! timeout 8 bash -lc 'cat < /dev/null > /dev/tcp/registry-1.docker.io/443' 2>/dev/null; then
-  echo "[error] Docker Hub unreachable from Docker host network."
-  echo "        Set Docker daemon proxy first, then retry:"
-  echo "        DOCKER_DAEMON_PROXY=http://127.0.0.1:17890 sudo -E bash ./enable_mirror_acceleration.sh"
-  exit 1
+  echo "[warn] Direct Docker Hub reachability check failed."
+  echo "       If Docker daemon proxy is configured (e.g. Clash 127.0.0.1:7897), build can still work."
+  echo "       Recommended: DOCKER_DAEMON_PROXY=http://127.0.0.1:7897 sudo -E bash ./enable_mirror_acceleration.sh"
 fi
 
 echo "[build] Building Docker image: ${IMAGE}"
