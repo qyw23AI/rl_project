@@ -86,9 +86,9 @@ WORKDIR /workspace
 # 先复制 requirements 可利用 Docker 层缓存。
 COPY requirements.txt /workspace/requirements.txt
 ARG QUICK_DEBUG=0
-ARG PIP_USE_CN_MIRROR=1
+ARG PIP_USE_CN_MIRROR=0
 RUN set -eux; \
-    conda run -n rl python -m pip install --upgrade pip; \
+    conda run -n rl python -m pip install --upgrade "pip<26"; \
     # 可通过 PIP_USE_CN_MIRROR 控制是否启用国内镜像。
     # - 1: 使用清华镜像（无代理或国际链路较慢时通常更稳）
     # - 0: 不使用国内镜像（代理质量较好时通常更快）
@@ -132,7 +132,9 @@ RUN set -eux; \
             echo "[warn] /workspace/isaacgym1/isaacgym/python/setup.py not found, skip editable isaacgym install."; \
         fi; \
         if [ -f /workspace/IsaacGymEnvs/setup.py ] || [ -f /workspace/IsaacGymEnvs/pyproject.toml ]; then \
-            conda run -n rl python -m pip install -e /workspace/IsaacGymEnvs; \
+            echo "[pip] installing IsaacGymEnvs in editable mode without dependency re-resolution"; \
+            conda run -n rl python -m pip install --no-deps -v -e /workspace/IsaacGymEnvs; \
+            echo "[pip] IsaacGymEnvs editable install finished"; \
         else \
             echo "[warn] /workspace/IsaacGymEnvs project metadata not found, skip editable IsaacGymEnvs install."; \
         fi
