@@ -39,13 +39,13 @@ require_cmd tar "Please install tar first."
 require_cmd docker "Please install Docker Engine and ensure 'docker' is in PATH."
 require_cmd timeout "Please install coreutils timeout command."
 
-if [[ -d "${REPO_DIR}/.git" ]]; then
-  echo "[sync] Repo exists. Pulling latest changes..."
-  git -C "${REPO_DIR}" pull --rebase
-else
-  echo "[sync] Repo not found. Cloning..."
-  git clone "${REPO_URL}" "${REPO_DIR}"
-fi
+# if [[ -d "${REPO_DIR}/.git" ]]; then
+#   echo "[sync] Repo exists. Pulling latest changes..."
+#   git -C "${REPO_DIR}" pull --rebase
+# else
+#   echo "[sync] Repo not found. Cloning..."
+#   git clone "${REPO_URL}" "${REPO_DIR}"
+# fi
  
 echo "[sync] Initializing/updating git submodules (if configured)..."
 git -C "${REPO_DIR}" submodule sync --recursive || true

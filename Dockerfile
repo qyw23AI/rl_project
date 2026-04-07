@@ -86,7 +86,7 @@ WORKDIR /workspace
 # 先复制 requirements 可利用 Docker 层缓存。
 COPY requirements.txt /workspace/requirements.txt
 ARG QUICK_DEBUG=0
-ARG PIP_USE_CN_MIRROR=0
+ARG PIP_USE_CN_MIRROR=1
 RUN set -eux; \
     conda run -n rl python -m pip install --upgrade "pip<26"; \
     # 可通过 PIP_USE_CN_MIRROR 控制是否启用国内镜像。
