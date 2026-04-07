@@ -88,7 +88,6 @@ COPY requirements.txt /workspace/requirements.txt
 ARG QUICK_DEBUG=0
 ARG PIP_USE_CN_MIRROR=1
 RUN set -eux; \
-    conda run -n rl python -m pip install --upgrade "pip<26"; \
     # 可通过 PIP_USE_CN_MIRROR 控制是否启用国内镜像。
     # - 1: 使用清华镜像（无代理或国际链路较慢时通常更稳）
     # - 0: 不使用国内镜像（代理质量较好时通常更快）
@@ -103,14 +102,35 @@ RUN set -eux; \
         conda run -n rl python -m pip config unset global.trusted-host || true; \
     fi; \
     awk 'BEGIN{skip=0} /^-f[[:space:]]/{next} /^torch==/{next} /^torchvision==/{next} {print}' /workspace/requirements.txt > /tmp/requirements_light.txt; \
-    awk '/^-f[[:space:]]|^torch==|^torchvision==/' /workspace/requirements.txt > /tmp/requirements_heavy.txt; \
+    awk '/^torch==|^torchvision==/' /workspace/requirements.txt > /tmp/requirements_heavy.txt; \
+    TORCH_FIND_LINKS="$(awk '/^-f[[:space:]]/{print $2; exit}' /workspace/requirements.txt)"; \
     echo "[pip] phase-1(light deps) start"; \
-    conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v -r /tmp/requirements_light.txt; \
+    while IFS= read -r requirement; do \
+        case "$requirement" in \
+            ""|\#*) continue ;; \
+            *) \
+                echo "[pip] installing: ${requirement}"; \
+                conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
+                ;; \
+        esac; \
+    done < /tmp/requirements_light.txt; \
     if [ "${QUICK_DEBUG}" = "1" ]; then \
         echo "[pip] QUICK_DEBUG=1: skip heavy deps (torch/torchvision) for fast troubleshooting"; \
     else \
         echo "[pip] phase-2(heavy deps: torch/torchvision) start"; \
-        conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v -r /tmp/requirements_heavy.txt; \
+        while IFS= read -r requirement; do \
+            case "$requirement" in \
+                ""|\#*) continue ;; \
+                *) \
+                    echo "[pip] installing: ${requirement}"; \
+                    if [ -n "${TORCH_FIND_LINKS}" ]; then \
+                        conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v -f "${TORCH_FIND_LINKS}" "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
+                    else \
+                        conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
+                    fi; \
+                    ;; \
+            esac; \
+        done < /tmp/requirements_heavy.txt; \
     fi; \
     rm -f /tmp/requirements_light.txt /tmp/requirements_heavy.txt; \
     echo "[pip] requirements installation finished"
