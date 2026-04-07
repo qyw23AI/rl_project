@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-setuptools \
     python3-dev \
+    libpython3.8 \
     bzip2 \
     git \
     wget \
@@ -46,6 +47,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     x11vnc \
     xterm \
     && rm -rf /var/lib/apt/lists/*
+
+# 为了支持 isaacgym gym_38.so（Python 3.8 编译的二进制），
+# 从 Ubuntu 20.04 源补充 libpython3.8 库（Ubuntu 22.04 已移除该版本）。
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ca-certificates curl; \
+    mkdir -p /tmp/py38; \
+    cd /tmp/py38; \
+    curl -L -o libpython3.8.deb "http://mirrors.aliyun.com/ubuntu/pool/main/p/python3.8/libpython3.8_3.8.10-0ubuntu1~20.04.9_amd64.deb" || \
+    curl -L -o libpython3.8.deb "http://archive.ubuntu.com/ubuntu/pool/main/p/python3.8/libpython3.8_3.8.10-0ubuntu1~20.04.9_amd64.deb"; \
+    dpkg -i libpython3.8.deb || true; \
+    rm -rf /tmp/py38; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*; \
+    echo "[ok] libpython3.8 supplemented for isaacgym gym_38.so support"
 
 # 安装 VirtualGL 与 TurboVNC。
 # 说明：下面 URL 为示例版本，可按官方发布页替换为更新版本。
@@ -79,7 +96,7 @@ ENV PATH=${CONDA_DIR}/bin:${PATH}
 # MuJoCo/图形库常用动态库路径。
 # 运行时通过 LD_LIBRARY_PATH 让 Python 扩展更容易找到 GL、MuJoCo 及 NVIDIA 相关库。
 ENV MUJOCO_GL=egl \
-    LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+    LD_LIBRARY_PATH=/opt/conda/envs/rl/lib:/opt/conda/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
 
 WORKDIR /workspace
 
