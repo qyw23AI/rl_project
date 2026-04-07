@@ -1,115 +1,153 @@
-### 提示词 1 更新 Dockerfile 添加挂载说明与运行时提示
+# Next Steps：在 RTX 4090服务器上使用docker真正跑通 GPU 强化学习
 
-text
+## A. 目标
 
-```
-### 目标文件: Dockerfile（在仓库根）
-请修改现有 Dockerfile，**只添加注释与运行时提示**，不要改变镜像构建逻辑。要求：
-- 在文件顶部或合适位置添加一段注释，说明**不要把 mjkey.txt 或模型文件写入镜像**，并明确说明运行容器时应通过 `-v` 将宿主机目录挂载到容器内（给出示例路径）。
-- 在 Dockerfile 末尾或 CMD 前，添加一行注释示例，展示推荐的运行命令模板（示例）：
-```
+- 将当前“CPU 可验证”状态升级为“RTX 4090 可稳定 GPU 训练 + 可视化”。
 
-# 运行示例（在宿主机执行）：
+## B. 必做改造项（按优先级）
 
-docker run --gpus all -it --rm \
+### 1) 升级 PyTorch/CUDA 栈以支持 `sm_89`
 
--v /home/ubuntu/.mujoco:/root/.mujoco:ro \
+- 现状：当前环境使用旧 Torch（不支持 4090）。
+- 目标：切换到支持 Ada 架构（4090）的 Torch 版本（建议 Torch 2.4+，CUDA 12.1/12.4 轮子）。
+- 验收：
+  - `python -c "import torch; print(torch.cuda.get_device_name(0))"` 正常；
+  - 不再出现 `no kernel image is available`。
 
--v /home/ubuntu/rl-data/checkpoints:/workspace/checkpoints \
+### 2) 处理 Isaac Gym 与新 Torch 的兼容性
 
--v /home/ubuntu/rl-data/logs:/workspace/logs \
+- 现状：`isaacgym 1.0rc4` 为老二进制分发，和新 Torch 栈存在不确定兼容风险。
+- 目标：
+  - 优先验证现有 `isaacgym` + 新 Torch 是否可跑最小任务；
+  - 若不兼容，准备迁移到 NVIDIA 新一代仿真栈（Isaac Sim / Isaac Lab）。
+- 验收：`task=Cartpole` 在 `sim_device=cuda:0 rl_device=cuda:0` 下可启动并迭代。
 
---shm-size=4g \
+### 3) 固化依赖，避免运行时重解析
 
--p 5901:5901 \
+- 现状：editable 安装易引发二次依赖解析和版本漂移。
+- 目标：
+  - requirements 锁定关键版本（torch/torchvision/rl-games/hydra 等）；
+  - 源码包安装统一使用 `--no-deps`；
+  - 输出一份可复现的版本清单（`pip freeze`）。
+- 验收：重建镜像后版本一致，训练行为一致。
 
-yourrepo/rl-vgl:latest
+### 4) 统一容器启动路径（VNC/entrypoint）
 
-Code
+- 现状：历史上存在绕过 entrypoint 导致 VNC 不可用的问题。
+- 目标：
+  - 固化唯一启动命令（run_remote.sh）；
+  - VNC 使用固定 `DISPLAY=:1`；
+  - 保证 viewer 可见。
+- 验收：任意一次重启后都能通过 SSH 隧道 + VNC 进入桌面并看到训练窗口。
 
-```
-- 注释中解释每个挂载的必要性：`~/.mujoco` 为 MuJoCo license 与库，`/workspace/checkpoints` 保存模型，`/workspace/logs` 保存 tensorboard/logs。
-- 强调使用 `:ro` 对 mjkey 的只读挂载以提高安全性。
-- 输出修改后的 Dockerfile 内容（仅修改注释与示例命令部分）。
-```
+## C. 推荐执行顺序
 
-### 提示词 2 修改 docker_entrypoint.sh 确保挂载目录存在与权限提示
+1. 新建 `rl-gpu4090` 分支或新镜像 tag（避免污染当前可用 CPU 环境）。
+2. 升级 Torch/CUDA 并完成最小 CUDA 自检。
+3. 验证 `isaacgym` 最小任务（先 headless，再 viewer）。
+4. 跑 Cartpole GPU smoke test（10~50 iter）。
+5. 固化依赖与启动脚本，回归测试 VNC 可视化。
 
-text
+## D. 当前已完成（基线）
 
-```
-### 目标文件: docker_entrypoint.sh
-请修改或追加脚本逻辑，使 entrypoint 在启动 VNC/服务前：
-- 检查并创建容器内的持久化目录（/workspace/checkpoints, /workspace/logs）如果不存在则创建，并设置合适权限（chown/chmod），但不要改变文件属主为 root 的默认行为，提供注释说明如何在运行容器时用 -u 指定 UID。
-- 检查 /root/.mujoco/mjkey.txt 是否存在；若不存在，打印清晰错误并退出（exit 1），并给出提示如何在宿主机上传 mjkey 并挂载（示例 scp 命令）。
-- 在脚本中加入注释说明：为什么要在 entrypoint 检查目录与 mjkey（避免运行时崩溃与数据丢失）。
-- 保持原有 vncserver 启动逻辑不变，只在前面加入这些检查与提示。
-请输出完整修改后的 docker_entrypoint.sh 内容。
-```
+- CPU 训练已跑通并保存 checkpoint。
+- VNC 会话可用，可用于实时观察。
+- 问题归档见 [issues.md](issues.md)。
 
-### 提示词 3 更新 run_remote.sh 增加挂载示例与权限建议
+## E. 镜像可拉取性结论（本次核验）
 
-text
+- 结论：`nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04` 在 Docker Hub 上存在，可拉取。
+- 依据：Docker Hub tags 页面可检索到该 tag，且页面给出了标准拉取命令与镜像层信息。
+- 参考：<https://hub.docker.com/r/nvidia/cuda/tags?page=1&name=12.1.1-cudnn8-runtime-ubuntu22.04>
 
-```
-### 目标文件: run_remote.sh
-请生成或修改 run_remote.sh，使其成为远端一键构建并运行脚本，要求：
-- 在脚本开头检测 ~/.mujoco/mjkey.txt 是否存在，若不存在给出错误并退出。
-- 提供构建镜像命令：`docker build -t yourrepo/rl-vgl:latest .`
-- 提供运行容器的推荐命令（带挂载）并把占位符替换为变量（IMAGE, HOST_CHECKPOINT_DIR, HOST_LOG_DIR），例如：
-```
+## F. 重建后端到端验证流程（IsaacGym + MuJoCo + 本机可视化）
 
-IMAGE=yourrepo/rl-vgl:latest
-HOST_CHECKPOINT_DIR=/home/ubuntu/rl-data/checkpoints
-HOST_LOG_DIR=/home/ubuntu/rl-data/logs
-docker run --gpus all -it --rm 
--v /root/.mujoco:/root/.mujoco:ro 
--v ${HOST_CHECKPOINT_DIR}:/workspace/checkpoints 
--v ${HOST_LOG_DIR}:/workspace/logs 
---shm-size=4g 
--p 5901:5901 
-${IMAGE}
+### 0) 前置条件（服务器）
 
-Code
+- 已安装 Docker 与 NVIDIA Container Toolkit。
+- 项目目录位于服务器，例如 `/home/ubuntu/rl_project`。
+- MuJoCo 2.1.0 已在宿主机准备好：`~/.mujoco/mujoco210`。
+- 使用本文档中的统一入口脚本启动容器，避免绕过 entrypoint。
 
-```
-- 在脚本中加入说明如何以宿主用户 UID 启动容器以避免权限问题（示例 `-u $(id -u):$(id -g)`），并给出 chown 建议命令。
-- 在脚本末尾打印如何通过 SSH 隧道连接 VNC 的示例命令。
-- 输出完整 run_remote.sh 内容并在顶部注明需要替换的占位符。
-```
+### 1) 重建镜像
 
-### 提示词 4 新增 docker-compose.yml 示例包含挂载与用户映射
+在项目根目录执行：
 
-text
+- `docker build -t rl-vgl:latest .`
 
-```
-### 目标文件: docker-compose.yml
-请生成一个 docker-compose.yml 示例，放在仓库根，要求：
-- 服务名为 rl，image 使用占位符 yourrepo/rl-vgl:latest。
-- 使用 runtime: nvidia 或 environment 中设置 NVIDIA_VISIBLE_DEVICES（根据 compose 版本选择），并设置 shm_size: '4gb'。
-- 在 volumes 中示例绑定：
-  - ./checkpoints:/workspace/checkpoints
-  - ./logs:/workspace/logs
-  - ~/.mujoco:/root/.mujoco:ro
-- 提供可选的 user 字段注释，示例 `user: "${UID}:${GID}"` 并在 README 中说明如何在本地导出 UID/GID 环境变量再运行 `docker-compose up`。
-- 在文件中加入注释说明每个挂载的用途与安全建议（不要把 mjkey 放入仓库）。
-输出完整 docker-compose.yml 内容。
-```
+说明：
 
-### 提示词 5 更新 README 增加挂载与权限说明段落
+- 构建会安装锁定依赖；
+- `isaacgym` 与 `IsaacGymEnvs` 以 `--no-deps` 方式安装；
+- 构建末尾会产出 `/workspace/requirements.freeze.txt`（容器内路径）。
 
-text
+### 2) 启动容器（固定 DISPLAY=:1 + VNC）
 
-```
-### 目标文件: README.md（追加或修改）
-请在 README 中新增一个名为 持久化模型与挂载 的段落，要求内容包括：
-- 为什么要把 checkpoints/logs/mjkey 挂载到宿主机（持久化、备份、调试）。
-- 推荐的宿主目录结构示例：
-  /home/ubuntu/rl-data/checkpoints
-  /home/ubuntu/rl-data/logs
-  /home/ubuntu/.mujoco/mjkey.txt
-- 推荐运行命令示例（与 run_remote.sh 保持一致），并说明如何通过 SSH 隧道安全访问 VNC。
-- 说明权限问题与解决方法（使用 -u 指定 UID 或在宿主机 chown）。
-- 简短的恢复与备份建议（定期 rsync 或上传到 S3）。
-输出 README 的新增段落，语言简洁明了，便于直接粘贴。
-```
+推荐直接使用统一脚本：
+
+- `bash ./run_remote.sh`
+
+脚本会：
+
+- 以 `--gpus all` 启动容器；
+- 固定 `DISPLAY=:1`；
+- 将 VNC 映射到 `127.0.0.1:5901`；
+- 挂载 checkpoints/logs 与 `~/.mujoco`。
+
+### 3) 验证 IsaacGym（先 headless，再 viewer）
+
+进入容器：
+
+- `docker exec -it rl-vgl bash`
+
+先做 CUDA/设备自检：
+
+- `conda run -n rl python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"`
+
+再跑 Cartpole（headless）：
+
+- `cd /workspace/IsaacGymEnvs`
+- `conda run -n rl python ./isaacgymenvs/train.py task=Cartpole sim_device=cuda:0 rl_device=cuda:0 headless=True max_iterations=50`
+
+最后跑 Cartpole（viewer）：
+
+- `export DISPLAY=:1`
+- `cd /workspace/IsaacGymEnvs`
+- `conda run -n rl python ./isaacgymenvs/train.py task=Cartpole sim_device=cuda:0 rl_device=cuda:0 headless=False max_iterations=50`
+
+验收标准：
+
+- 不出现 `no kernel image is available`；
+- 训练可进入迭代；
+- viewer 可见仿真画面。
+
+### 4) 验证 MuJoCo（simulate）
+
+仍在容器内执行：
+
+- `cd /root/.mujoco/mujoco210/bin`
+- `./simulate ../model/humanoid.xml`
+
+说明：
+
+- 若命令找不到，请先确认宿主机 `~/.mujoco` 已正确挂载到容器 `/root/.mujoco`；
+- 若是远端图形会话，确保 `DISPLAY=:1` 与 VNC 会话正常。
+
+### 5) 在本机查看（SSH 隧道 + VNC）
+
+在你的本机（不是服务器）执行端口转发：
+
+- `ssh -N -L 5901:127.0.0.1:5901 <user>@<server_ip>`
+
+然后本机 VNC 客户端连接：
+
+- `127.0.0.1:5901`
+
+连接成功后可直接看到容器内桌面与 IsaacGym/MuJoCo 窗口。
+
+### 6) 失败时最小排查
+
+- 容器状态：`docker ps -a | grep rl-vgl`
+- VNC 日志：`docker logs rl-vgl --tail 200`
+- GPU 可见性：`docker exec -it rl-vgl nvidia-smi`
+- 训练脚本快速回归：`docker exec -it rl-vgl bash -lc 'cd /workspace && ./gpu_smoke_test.sh'`

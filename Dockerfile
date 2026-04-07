@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1
 # 目标：在单容器内提供 Isaac Gym + MuJoCo + VirtualGL + TurboVNC 环境
-# 基础镜像固定为 CUDA 11.8 + Ubuntu 22.04，以兼容 torch 1.11.0+cu113。
-# 说明：nvidia/cuda:11.3.1-cudnn8-runtime-ubuntu22.04 不存在；11.8.0 22.04 组合可正常拉取。
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+# 基础镜像升级为 CUDA 12.1 + Ubuntu 22.04，以匹配 4090 目标栈（Torch 2.4+ / cu121）。
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
@@ -199,7 +198,7 @@ RUN set -eux; \
             git clone --depth 1 "${ISAACGYM_GIT_URL}" /workspace/isaacgym1; \
         fi; \
         if [ -f /workspace/isaacgym1/isaacgym/python/setup.py ]; then \
-            conda run -n rl python -m pip install -e /workspace/isaacgym1/isaacgym/python; \
+            conda run -n rl python -m pip install --no-deps -e /workspace/isaacgym1/isaacgym/python; \
         else \
             echo "[error] /workspace/isaacgym1/isaacgym/python/setup.py not found."; \
             echo "[hint] Please provide source under /workspace/isaacgym1 or set --build-arg ISAACGYM_GIT_URL=<repo>."; \
@@ -207,12 +206,14 @@ RUN set -eux; \
         fi; \
         if [ -f /workspace/IsaacGymEnvs/setup.py ] || [ -f /workspace/IsaacGymEnvs/pyproject.toml ]; then \
             echo "[pip] installing IsaacGymEnvs in editable mode"; \
-            conda run -n rl python -m pip install -v -e /workspace/IsaacGymEnvs; \
+            conda run -n rl python -m pip install --no-deps -v -e /workspace/IsaacGymEnvs; \
             echo "[pip] IsaacGymEnvs editable install finished"; \
         else \
             echo "[error] /workspace/IsaacGymEnvs project metadata not found."; \
             exit 1; \
-        fi
+        fi; \
+        conda run -n rl python -m pip freeze > /workspace/requirements.freeze.txt; \
+        echo "[pip] freeze written to /workspace/requirements.freeze.txt"
 
 # MuJoCo 2.1.0 运行时提示（与用户手动命令保持一致）：
 # - 可在宿主机执行：

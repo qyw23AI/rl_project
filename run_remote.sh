@@ -131,6 +131,7 @@ echo "[run] Starting container with GPU + MuJoCo mount + enlarged /dev/shm..."
 docker run -d --name rl-vgl \
   --gpus all \
   --shm-size=4g \
+  -e DISPLAY=:1 \
   -v "${HOME}/.mujoco:/root/.mujoco:ro" \
   -v "${HOST_CHECKPOINT_DIR}:/workspace/checkpoints" \
   -v "${HOST_LOG_DIR}:/workspace/logs" \

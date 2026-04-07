@@ -16,6 +16,7 @@ services:
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
+      DISPLAY: ":1"
     shm_size: "4gb"
     volumes:
       # 保存训练 checkpoints，防止容器删除后模型丢失。

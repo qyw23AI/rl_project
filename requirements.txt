@@ -1,7 +1,7 @@
-# PyTorch 源（版本不锁死，按 Isaac Gym 兼容性解析）
--f https://download.pytorch.org/whl/torch_stable.html
-torch
-torchvision
+# PyTorch 4090 推荐栈（CUDA 12.1）
+-f https://download.pytorch.org/whl/cu121
+torch==2.4.1+cu121
+torchvision==0.19.1+cu121
 
 # MuJoCo Python 绑定（示例兼容版本）
 mujoco-py==2.1.2.14
@@ -12,7 +12,7 @@ omegaconf==2.3.0
 termcolor==2.4.0
 jinja2==3.1.6
 hydra-core==1.3.2
-# rl-games 版本由项目需求决定；如与 torch 冲突可按构建日志回退
+# 关键训练依赖锁定（避免重建时漂移）
 rl-games==1.6.1
 pyvirtualdisplay==3.0
 urdfpy==0.0.22
