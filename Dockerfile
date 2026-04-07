@@ -67,6 +67,8 @@ RUN set -eux; \
     chmod +x /tmp/Miniconda3-latest-Linux-x86_64.sh; \
     /tmp/Miniconda3-latest-Linux-x86_64.sh -b -p "${CONDA_DIR}"; \
     rm -f /tmp/Miniconda3-latest-Linux-x86_64.sh; \
+    "${CONDA_DIR}/bin/conda" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main; \
+    "${CONDA_DIR}/bin/conda" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r; \
     "${CONDA_DIR}/bin/conda" clean -afy; \
     "${CONDA_DIR}/bin/conda" create -y -n rl python=3.8.10; \
     "${CONDA_DIR}/bin/conda" clean -afy
