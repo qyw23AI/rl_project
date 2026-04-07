@@ -19,6 +19,8 @@ MUJOCO_TAR="mujoco210-linux-x86_64.tar.gz"
 MUJOCO_URL="https://mujoco.org/download/${MUJOCO_TAR}"
 DOCKER_BUILDKIT_MODE="${DOCKER_BUILDKIT_MODE:-0}"
 DOCKER_BUILD_PROGRESS="${DOCKER_BUILD_PROGRESS:-plain}"
+QUICK_DEBUG="${QUICK_DEBUG:-0}"
+PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR:-1}"
 GIT_JOBS="${GIT_JOBS:-8}"
 
 require_cmd() {
@@ -82,10 +84,14 @@ echo "[build] Building Docker image: ${IMAGE}"
 if [[ "${DOCKER_BUILDKIT_MODE}" == "0" ]]; then
   echo "[build] Using legacy builder (DOCKER_BUILDKIT=0) to avoid docker/dockerfile frontend pull timeout."
   echo "[build] Tip: set DOCKER_BUILDKIT_MODE=1 to get detailed streaming logs."
-  DOCKER_BUILDKIT=0 docker build -t "${IMAGE}" .
+  echo "[build] QUICK_DEBUG=${QUICK_DEBUG}"
+  echo "[build] PIP_USE_CN_MIRROR=${PIP_USE_CN_MIRROR}"
+  DOCKER_BUILDKIT=0 docker build --build-arg QUICK_DEBUG="${QUICK_DEBUG}" --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" -t "${IMAGE}" .
 else
   echo "[build] Using BuildKit (DOCKER_BUILDKIT=1, --progress=${DOCKER_BUILD_PROGRESS})."
-  DOCKER_BUILDKIT=1 docker build --progress="${DOCKER_BUILD_PROGRESS}" -t "${IMAGE}" .
+  echo "[build] QUICK_DEBUG=${QUICK_DEBUG}"
+  echo "[build] PIP_USE_CN_MIRROR=${PIP_USE_CN_MIRROR}"
+  DOCKER_BUILDKIT=1 docker build --progress="${DOCKER_BUILD_PROGRESS}" --build-arg QUICK_DEBUG="${QUICK_DEBUG}" --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" -t "${IMAGE}" .
 fi
 
 echo "[run] Starting container with GPU + MuJoCo mount + enlarged /dev/shm..."

@@ -85,13 +85,34 @@ WORKDIR /workspace
 
 # 先复制 requirements 可利用 Docker 层缓存。
 COPY requirements.txt /workspace/requirements.txt
-RUN conda run -n rl python -m pip install --upgrade pip && \
-        # 统一设置 pip 国内镜像（清华源）以提升中国大陆网络环境下的安装稳定性。
-        # 注意：torch/torchvision 的 cu113 轮子仍通过 requirements.txt 顶部的 -f 源解析。
-    conda run -n rl python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    conda run -n rl python -m pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn && \
-    echo "[pip] start installing requirements (this can take a while for torch wheels)" && \
-    conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v -r /workspace/requirements.txt && \
+ARG QUICK_DEBUG=0
+ARG PIP_USE_CN_MIRROR=1
+RUN set -eux; \
+    conda run -n rl python -m pip install --upgrade pip; \
+    # 可通过 PIP_USE_CN_MIRROR 控制是否启用国内镜像。
+    # - 1: 使用清华镜像（无代理或国际链路较慢时通常更稳）
+    # - 0: 不使用国内镜像（代理质量较好时通常更快）
+    # 注意：torch/torchvision 的 cu113 轮子仍通过 requirements.txt 顶部的 -f 源解析。
+    if [ "${PIP_USE_CN_MIRROR}" = "1" ]; then \
+        echo "[pip] use CN mirror: tuna"; \
+        conda run -n rl python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; \
+        conda run -n rl python -m pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn; \
+    else \
+        echo "[pip] use default index (proxy-friendly mode)"; \
+        conda run -n rl python -m pip config unset global.index-url || true; \
+        conda run -n rl python -m pip config unset global.trusted-host || true; \
+    fi; \
+    awk 'BEGIN{skip=0} /^-f[[:space:]]/{next} /^torch==/{next} /^torchvision==/{next} {print}' /workspace/requirements.txt > /tmp/requirements_light.txt; \
+    awk '/^-f[[:space:]]|^torch==|^torchvision==/' /workspace/requirements.txt > /tmp/requirements_heavy.txt; \
+    echo "[pip] phase-1(light deps) start"; \
+    conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v -r /tmp/requirements_light.txt; \
+    if [ "${QUICK_DEBUG}" = "1" ]; then \
+        echo "[pip] QUICK_DEBUG=1: skip heavy deps (torch/torchvision) for fast troubleshooting"; \
+    else \
+        echo "[pip] phase-2(heavy deps: torch/torchvision) start"; \
+        conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v -r /tmp/requirements_heavy.txt; \
+    fi; \
+    rm -f /tmp/requirements_light.txt /tmp/requirements_heavy.txt; \
     echo "[pip] requirements installation finished"
 
 # 关于你给出的 conda pytorch 命令说明：
