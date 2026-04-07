@@ -21,6 +21,9 @@ DOCKER_BUILDKIT_MODE="${DOCKER_BUILDKIT_MODE:-0}"
 DOCKER_BUILD_PROGRESS="${DOCKER_BUILD_PROGRESS:-plain}"
 QUICK_DEBUG="${QUICK_DEBUG:-0}"
 PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR:-1}"
+ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL:-https://github.com/isaac-sim/IsaacGymEnvs.git}"
+ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL:-}"
+ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE:-/workspace/issacgym.tar.xz}"
 GIT_JOBS="${GIT_JOBS:-8}"
 
 require_cmd() {
@@ -86,12 +89,39 @@ if [[ "${DOCKER_BUILDKIT_MODE}" == "0" ]]; then
   echo "[build] Tip: set DOCKER_BUILDKIT_MODE=1 to get detailed streaming logs."
   echo "[build] QUICK_DEBUG=${QUICK_DEBUG}"
   echo "[build] PIP_USE_CN_MIRROR=${PIP_USE_CN_MIRROR}"
-  DOCKER_BUILDKIT=0 docker build --build-arg QUICK_DEBUG="${QUICK_DEBUG}" --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" -t "${IMAGE}" .
+  echo "[build] ISAACGYMENVS_GIT_URL=${ISAACGYMENVS_GIT_URL}"
+  echo "[build] ISAACGYM_ARCHIVE=${ISAACGYM_ARCHIVE}"
+  if [[ -n "${ISAACGYM_GIT_URL}" ]]; then
+    echo "[build] ISAACGYM_GIT_URL is set"
+  else
+    echo "[build] ISAACGYM_GIT_URL is empty (expect local /workspace/isaacgym1 source)"
+  fi
+  DOCKER_BUILDKIT=0 docker build \
+    --build-arg QUICK_DEBUG="${QUICK_DEBUG}" \
+    --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" \
+    --build-arg ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL}" \
+    --build-arg ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL}" \
+    --build-arg ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE}" \
+    -t "${IMAGE}" .
 else
   echo "[build] Using BuildKit (DOCKER_BUILDKIT=1, --progress=${DOCKER_BUILD_PROGRESS})."
   echo "[build] QUICK_DEBUG=${QUICK_DEBUG}"
   echo "[build] PIP_USE_CN_MIRROR=${PIP_USE_CN_MIRROR}"
-  DOCKER_BUILDKIT=1 docker build --progress="${DOCKER_BUILD_PROGRESS}" --build-arg QUICK_DEBUG="${QUICK_DEBUG}" --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" -t "${IMAGE}" .
+  echo "[build] ISAACGYMENVS_GIT_URL=${ISAACGYMENVS_GIT_URL}"
+  echo "[build] ISAACGYM_ARCHIVE=${ISAACGYM_ARCHIVE}"
+  if [[ -n "${ISAACGYM_GIT_URL}" ]]; then
+    echo "[build] ISAACGYM_GIT_URL is set"
+  else
+    echo "[build] ISAACGYM_GIT_URL is empty (expect local /workspace/isaacgym1 source)"
+  fi
+  DOCKER_BUILDKIT=1 docker build \
+    --progress="${DOCKER_BUILD_PROGRESS}" \
+    --build-arg QUICK_DEBUG="${QUICK_DEBUG}" \
+    --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" \
+    --build-arg ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL}" \
+    --build-arg ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL}" \
+    --build-arg ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE}" \
+    -t "${IMAGE}" .
 fi
 
 echo "[run] Starting container with GPU + MuJoCo mount + enlarged /dev/shm..."
@@ -101,7 +131,6 @@ echo "[run] Starting container with GPU + MuJoCo mount + enlarged /dev/shm..."
 docker run -d --name rl-vgl \
   --gpus all \
   --shm-size=4g \
-  -u "$(id -u):$(id -g)" \
   -v "${HOME}/.mujoco:/root/.mujoco:ro" \
   -v "${HOST_CHECKPOINT_DIR}:/workspace/checkpoints" \
   -v "${HOST_LOG_DIR}:/workspace/logs" \

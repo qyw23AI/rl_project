@@ -91,7 +91,7 @@ RUN set -eux; \
     # 可通过 PIP_USE_CN_MIRROR 控制是否启用国内镜像。
     # - 1: 使用清华镜像（无代理或国际链路较慢时通常更稳）
     # - 0: 不使用国内镜像（代理质量较好时通常更快）
-    # 注意：torch/torchvision 的 cu113 轮子仍通过 requirements.txt 顶部的 -f 源解析。
+    # 注意：torch/torchvision 版本不在此处锁死，交由后续安装链路按 Isaac Gym 兼容性解析。
     if [ "${PIP_USE_CN_MIRROR}" = "1" ]; then \
         echo "[pip] use CN mirror: tuna"; \
         conda run -n rl python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; \
@@ -101,8 +101,8 @@ RUN set -eux; \
         conda run -n rl python -m pip config unset global.index-url || true; \
         conda run -n rl python -m pip config unset global.trusted-host || true; \
     fi; \
-    awk 'BEGIN{skip=0} /^-f[[:space:]]/{next} /^torch==/{next} /^torchvision==/{next} {print}' /workspace/requirements.txt > /tmp/requirements_light.txt; \
-    awk '/^torch==|^torchvision==/' /workspace/requirements.txt > /tmp/requirements_heavy.txt; \
+    awk 'BEGIN{skip=0} /^-f[[:space:]]/{next} /^torch([<=>]|$)/{next} /^torchvision([<=>]|$)/{next} {print}' /workspace/requirements.txt > /tmp/requirements_light.txt; \
+    awk '/^torch([<=>]|$)|^torchvision([<=>]|$)/' /workspace/requirements.txt > /tmp/requirements_heavy.txt; \
     TORCH_FIND_LINKS="$(awk '/^-f[[:space:]]/{print $2; exit}' /workspace/requirements.txt)"; \
     echo "[pip] phase-1(light deps) start"; \
     while IFS= read -r requirement; do \
@@ -135,28 +135,66 @@ RUN set -eux; \
     rm -f /tmp/requirements_light.txt /tmp/requirements_heavy.txt; \
     echo "[pip] requirements installation finished"
 
-# 关于你给出的 conda pytorch 命令说明：
-# - 你给的示例是：conda install pytorch torchvision pytorch-cuda=12.1.0 -c pytorch -c nvidia
-# - 但当前基础镜像为 CUDA 11.3，因此此镜像内采用 torch==1.11.0+cu113（与 CUDA 11.3 对齐）更稳妥。
-# - 若你要切换到 pytorch-cuda=12.1，请同步把基础镜像升级到 CUDA 12.x。
+# 说明：torch/torchvision 版本不在 requirements 中强制锁死，按 Isaac Gym / IsaacGymEnvs 依赖链路解析。
 
 # 再复制项目内容到 /workspace。
 COPY . /workspace
 
-# 安装 Isaac Gym / IsaacGymEnvs（可编辑模式），以便直接在源码目录调试。
-# 如果源码尚未放入对应目录，则跳过并给出提示（避免镜像构建硬失败）。
+# 安装 Isaac Gym / IsaacGymEnvs（可编辑模式）。
+# - IsaacGymEnvs 缺失时自动拉取官方仓库。
+# - 优先使用上传的 isaacgym 压缩包（issacgym.tar.xz / isaacgym.tar.xz）自动解压安装。
+# - 若压缩包不可用，再尝试通过 build-arg ISAACGYM_GIT_URL 拉取。
+ARG ISAACGYMENVS_GIT_URL=https://github.com/isaac-sim/IsaacGymEnvs.git
+ARG ISAACGYM_GIT_URL=
+ARG ISAACGYM_ARCHIVE=/workspace/issacgym.tar.xz
 RUN set -eux; \
+        if [ ! -f /workspace/IsaacGymEnvs/setup.py ] && [ ! -f /workspace/IsaacGymEnvs/pyproject.toml ]; then \
+            echo "[git] IsaacGymEnvs source missing, cloning from ${ISAACGYMENVS_GIT_URL}"; \
+            rm -rf /workspace/IsaacGymEnvs; \
+            git clone --depth 1 "${ISAACGYMENVS_GIT_URL}" /workspace/IsaacGymEnvs; \
+        fi; \
+        if [ ! -f /workspace/isaacgym1/isaacgym/python/setup.py ]; then \
+            ISAACGYM_ARCHIVE_REAL=""; \
+            for c in "${ISAACGYM_ARCHIVE}" /workspace/issacgym.tar.xz /workspace/isaacgym.tar.xz; do \
+                if [ -f "$c" ]; then \
+                    ISAACGYM_ARCHIVE_REAL="$c"; \
+                    break; \
+                fi; \
+            done; \
+            if [ -n "${ISAACGYM_ARCHIVE_REAL}" ]; then \
+                echo "[archive] isaacgym source missing, extracting ${ISAACGYM_ARCHIVE_REAL}"; \
+                rm -rf /workspace/isaacgym1 /tmp/isaacgym_extract; \
+                mkdir -p /tmp/isaacgym_extract /workspace/isaacgym1; \
+                tar -xJf "${ISAACGYM_ARCHIVE_REAL}" -C /tmp/isaacgym_extract; \
+                ISAACGYM_SETUP_PATH="$(find /tmp/isaacgym_extract -maxdepth 8 -path '*/isaacgym/python/setup.py' | head -n 1 || true)"; \
+                if [ -z "${ISAACGYM_SETUP_PATH}" ]; then \
+                    echo "[error] cannot find isaacgym/python/setup.py inside ${ISAACGYM_ARCHIVE_REAL}"; \
+                    exit 1; \
+                fi; \
+                ISAACGYM_ROOT_DIR="$(dirname "$(dirname "$(dirname "${ISAACGYM_SETUP_PATH}")")")"; \
+                cp -a "${ISAACGYM_ROOT_DIR}/." /workspace/isaacgym1/; \
+                rm -rf /tmp/isaacgym_extract; \
+            fi; \
+        fi; \
+        if [ ! -f /workspace/isaacgym1/isaacgym/python/setup.py ] && [ -n "${ISAACGYM_GIT_URL}" ]; then \
+            echo "[git] isaacgym source missing, cloning from ${ISAACGYM_GIT_URL}"; \
+            rm -rf /workspace/isaacgym1; \
+            git clone --depth 1 "${ISAACGYM_GIT_URL}" /workspace/isaacgym1; \
+        fi; \
         if [ -f /workspace/isaacgym1/isaacgym/python/setup.py ]; then \
             conda run -n rl python -m pip install -e /workspace/isaacgym1/isaacgym/python; \
         else \
-            echo "[warn] /workspace/isaacgym1/isaacgym/python/setup.py not found, skip editable isaacgym install."; \
+            echo "[error] /workspace/isaacgym1/isaacgym/python/setup.py not found."; \
+            echo "[hint] Please provide source under /workspace/isaacgym1 or set --build-arg ISAACGYM_GIT_URL=<repo>."; \
+            exit 1; \
         fi; \
         if [ -f /workspace/IsaacGymEnvs/setup.py ] || [ -f /workspace/IsaacGymEnvs/pyproject.toml ]; then \
-            echo "[pip] installing IsaacGymEnvs in editable mode without dependency re-resolution"; \
-            conda run -n rl python -m pip install --no-deps -v -e /workspace/IsaacGymEnvs; \
+            echo "[pip] installing IsaacGymEnvs in editable mode"; \
+            conda run -n rl python -m pip install -v -e /workspace/IsaacGymEnvs; \
             echo "[pip] IsaacGymEnvs editable install finished"; \
         else \
-            echo "[warn] /workspace/IsaacGymEnvs project metadata not found, skip editable IsaacGymEnvs install."; \
+            echo "[error] /workspace/IsaacGymEnvs project metadata not found."; \
+            exit 1; \
         fi
 
 # MuJoCo 2.1.0 运行时提示（与用户手动命令保持一致）：

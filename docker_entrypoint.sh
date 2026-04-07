@@ -10,12 +10,14 @@ VGL_CONFIG_MARKER="/var/run/.vgl_configured"
 VNC_DISPLAY=":1"
 VNC_GEOMETRY="1920x1080"
 VNC_DEPTH="24"
-VNC_LOG="/root/.vnc/$(hostname)${VNC_DISPLAY}.log"
-MUJOCO_KEY="/root/.mujoco/mjkey.txt"
+HOME_DIR="${HOME:-/root}"
+VNC_DIR="${HOME_DIR}/.vnc"
+VNC_LOG="${VNC_DIR}/$(hostname)${VNC_DISPLAY}.log"
+MUJOCO_KEY="${HOME_DIR}/.mujoco/mjkey.txt"
 CHECKPOINT_DIR="/workspace/checkpoints"
 LOG_DIR="/workspace/logs"
 
-mkdir -p /var/run /root/.vnc
+mkdir -p /var/run "${VNC_DIR}"
 
 # 先准备持久化目录，避免训练中途因为目录不存在而报错或把数据写到临时位置。
 # 默认仍保持 root 属主行为；如果你希望容器内文件按宿主用户写入，可在 docker run 时增加：
@@ -24,13 +26,10 @@ mkdir -p /var/run /root/.vnc
 mkdir -p "${CHECKPOINT_DIR}" "${LOG_DIR}"
 chmod 775 "${CHECKPOINT_DIR}" "${LOG_DIR}"
 
-# 启动前检查 MuJoCo key 是否存在。缺少 key 会导致模拟器/环境初始化失败，因此在入口直接报错更容易定位。
+# 启动前检查 MuJoCo key。MuJoCo 2.1+ 通常无需 license key，这里仅提示不强制退出。
 if [[ ! -f "${MUJOCO_KEY}" ]]; then
-  echo "[entrypoint][error] Missing MuJoCo key: ${MUJOCO_KEY}"
-  echo "[entrypoint][hint] Please copy the key on the host first, for example:"
-  echo "  scp ~/.mujoco/mjkey.txt <user>@<server>:/home/ubuntu/.mujoco/mjkey.txt"
-  echo "[entrypoint][hint] Then run the container with: -v /home/ubuntu/.mujoco:/root/.mujoco:ro"
-  exit 1
+  echo "[entrypoint][warn] MuJoCo key not found: ${MUJOCO_KEY}"
+  echo "[entrypoint][hint] MuJoCo 2.1+ usually works without mjkey. Continuing..."
 fi
 
 # 首次启动时执行 vglserver_config。
