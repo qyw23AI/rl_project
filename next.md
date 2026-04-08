@@ -58,7 +58,7 @@
 
 - 结论：`nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04` 在 Docker Hub 上存在，可拉取。
 - 依据：Docker Hub tags 页面可检索到该 tag，且页面给出了标准拉取命令与镜像层信息。
-- 参考：<https://hub.docker.com/r/nvidia/cuda/tags?page=1&name=12.1.1-cudnn8-runtime-ubuntu22.04>
+- 参考：[https://hub.docker.com/r/nvidia/cuda/tags?page=1&amp;name=12.1.1-cudnn8-runtime-ubuntu22.04](https://hub.docker.com/r/nvidia/cuda/tags?page=1&name=12.1.1-cudnn8-runtime-ubuntu22.04)
 
 ## F. 重建后端到端验证流程（IsaacGym + MuJoCo + 本机可视化）
 

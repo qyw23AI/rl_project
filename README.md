@@ -7,14 +7,14 @@
 ## 1) PyTorch 与 Python 依赖
 
 - 已在 [requirements.txt](requirements.txt) 中包含：
-  - `torch==1.11.0+cu113`
-  - `torchvision==0.12.0+cu113`
+  - `torch==2.4.1`（通过 Dockerfile 中的 conda 方式安装，CUDA 12.1）
+  - `torchvision==0.19.1`（通过 Dockerfile 中的 conda 方式安装，CUDA 12.1）
   - `pyquaternion` `pyyaml` `pexpect` `matplotlib` `einops` `tqdm` `packaging`
   - `h5py` `ipython` `getkey` `wandb` `chardet`
   - `numpy==1.23.2` `h5py_cache` `opencv-python`
   - `tensorboard` `onnxruntime` `mujoco-python-viewer` `scipy` `gym` `mujoco-py`
 - 镜像中通过 `python3-pip` 安装 pip，并配置清华镜像源。
-- 当前镜像基座已调整为 `nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04`，以保留 Ubuntu 22.04，同时使用可正常拉取的 CUDA 22.04 组合。
+- 当前镜像基座已调整为 `nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04`，并在 conda `rl` 环境里预装 PyTorch CUDA 12.1 组合。
 
 ## 2) Isaac Gym 安装与验证
 

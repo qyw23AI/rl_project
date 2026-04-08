@@ -16,8 +16,26 @@ VNC_LOG="${VNC_DIR}/$(hostname)${VNC_DISPLAY}.log"
 MUJOCO_KEY="${HOME_DIR}/.mujoco/mjkey.txt"
 CHECKPOINT_DIR="/workspace/checkpoints"
 LOG_DIR="/workspace/logs"
+CONDA_ENV_LIB="/opt/conda/envs/rl/lib"
+SYSTEM_LIB_DIR="/usr/lib/x86_64-linux-gnu"
 
 mkdir -p /var/run "${VNC_DIR}"
+
+# 兼容 Isaac Gym 的 gym_38.so 对 libpython3.8.so.1.0 的动态链接需求。
+# 某些环境下该库仅存在于 conda env 中，动态加载器默认路径可能找不到。
+export LD_LIBRARY_PATH="${CONDA_ENV_LIB}:/opt/conda/lib:${SYSTEM_LIB_DIR}:${LD_LIBRARY_PATH:-}"
+if [[ -f "${CONDA_ENV_LIB}/libpython3.8.so.1.0" ]]; then
+  mkdir -p "${SYSTEM_LIB_DIR}"
+  if [[ ! -e "${SYSTEM_LIB_DIR}/libpython3.8.so.1.0" ]]; then
+    ln -sf "${CONDA_ENV_LIB}/libpython3.8.so.1.0" "${SYSTEM_LIB_DIR}/libpython3.8.so.1.0"
+  fi
+  if [[ ! -e "${SYSTEM_LIB_DIR}/libpython3.8.so" && -e "${CONDA_ENV_LIB}/libpython3.8.so" ]]; then
+    ln -sf "${CONDA_ENV_LIB}/libpython3.8.so" "${SYSTEM_LIB_DIR}/libpython3.8.so"
+  fi
+  ldconfig || true
+else
+  echo "[entrypoint][warn] ${CONDA_ENV_LIB}/libpython3.8.so.1.0 not found; Isaac Gym may fail to import gym_38.so"
+fi
 
 # 先准备持久化目录，避免训练中途因为目录不存在而报错或把数据写到临时位置。
 # 默认仍保持 root 属主行为；如果你希望容器内文件按宿主用户写入，可在 docker run 时增加：
