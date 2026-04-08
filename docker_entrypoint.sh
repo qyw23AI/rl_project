@@ -16,8 +16,18 @@ VNC_LOG="${VNC_DIR}/$(hostname)${VNC_DISPLAY}.log"
 MUJOCO_KEY="${HOME_DIR}/.mujoco/mjkey.txt"
 CHECKPOINT_DIR="/workspace/checkpoints"
 LOG_DIR="/workspace/logs"
+VNC_PASSWORD="${VNC_PASSWORD:-rlvnc123}"
+TVNC_WM="${TVNC_WM:-xfce-session}"
 
 mkdir -p /var/run "${VNC_DIR}"
+
+# TurboVNC 在首次启动时需要一个有效密码文件；如果缺失或不合法，vncserver 会进入交互式提示并导致容器退出。
+# 这里采用非交互式方式初始化，避免无人值守启动失败。
+if [[ ! -f "${VNC_DIR}/passwd" ]]; then
+  echo "[entrypoint] Initializing TurboVNC password file..."
+  printf '%s\n%s\n\n' "${VNC_PASSWORD}" "${VNC_PASSWORD}" | /opt/TurboVNC/bin/vncpasswd > /dev/null
+  chmod 600 "${VNC_DIR}/passwd"
+fi
 
 # 先准备持久化目录，避免训练中途因为目录不存在而报错或把数据写到临时位置。
 # 默认仍保持 root 属主行为；如果你希望容器内文件按宿主用户写入，可在 docker run 时增加：
@@ -52,7 +62,7 @@ fi
 
 # 以 24-bit 色深启动 VNC，可显著降低 OpenGL/VirtualGL 显示异常概率。
 echo "[entrypoint] Starting TurboVNC on ${VNC_DISPLAY} (${VNC_GEOMETRY}, depth ${VNC_DEPTH})..."
-/opt/TurboVNC/bin/vncserver "${VNC_DISPLAY}" -geometry "${VNC_GEOMETRY}" -depth "${VNC_DEPTH}"
+/opt/TurboVNC/bin/vncserver "${VNC_DISPLAY}" -geometry "${VNC_GEOMETRY}" -depth "${VNC_DEPTH}" -wm "${TVNC_WM}"
 
 echo "[entrypoint] Ready. Inside container, use vglrun to launch GPU apps:"
 echo "  vglrun conda run -n rl python train.py"

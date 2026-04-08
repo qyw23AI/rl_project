@@ -13,7 +13,7 @@ REPO_URL="${REPO_URL:-git@github.com:qyw23AI/rl_project.git}"
 REPO_DIR="${REPO_DIR:-${SCRIPT_DIR}}"
 IMAGE="${IMAGE:-rl-vgl:latest}"
 CONTAINER_NAME="${CONTAINER_NAME:-rl-vgl}"
-SKIP_BUILD="${SKIP_BUILD:-0}"
+SKIP_BUILD="${SKIP_BUILD:-1}"
 RECREATE_CONTAINER="${RECREATE_CONTAINER:-0}"
 HOST_CHECKPOINT_DIR="${HOST_CHECKPOINT_DIR:-${HOME}/rl-data/checkpoints}"
 HOST_LOG_DIR="${HOST_LOG_DIR:-${HOME}/rl-data/logs}"
@@ -160,9 +160,11 @@ docker run -d --name "${CONTAINER_NAME}" \
   --gpus all \
   --shm-size=4g \
   -e DISPLAY=:1 \
+  -e VNC_PASSWORD="${VNC_PASSWORD:-rlvnc123}" \
   -v "${HOME}/.mujoco:/root/.mujoco:ro" \
   -v "${HOST_CHECKPOINT_DIR}:/workspace/checkpoints" \
   -v "${HOST_LOG_DIR}:/workspace/logs" \
+  -v "${SCRIPT_DIR}/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh:ro" \
   -p 127.0.0.1:5901:5901 \
   "${IMAGE}"
 
