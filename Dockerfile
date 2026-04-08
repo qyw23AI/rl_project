@@ -142,6 +142,7 @@ RUN set -eux; \
     "${CONDA_DIR}/bin/conda" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r; \
     "${CONDA_DIR}/bin/conda" clean -afy; \
     "${CONDA_DIR}/bin/conda" create -y -n rl python=3.8.10; \
+    "${CONDA_DIR}/bin/conda" install -y -n rl -c pytorch -c nvidia pytorch==2.4.1 torchvision==0.19.1 pytorch-cuda=12.1; \
     "${CONDA_DIR}/bin/conda" clean -afy
 
 # 让 conda 可执行文件在 PATH 中可见。
@@ -174,6 +175,7 @@ RUN set -eux; \
     # - 1: 使用清华镜像（无代理或国际链路较慢时通常更稳）
     # - 0: 不使用国内镜像（代理质量较好时通常更快）
     # 注意：torch/torchvision 版本不在此处锁死，交由后续安装链路按 Isaac Gym 兼容性解析。
+    # 注意：torch/torchvision 已通过 conda 预装，避免 pip 解析 CUDA wheel 时受网络和索引波动影响。
     if [ "${PIP_USE_CN_MIRROR}" = "1" ]; then \
         echo "[pip] use CN mirror: tuna"; \
         conda run -n rl python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; \
@@ -185,25 +187,8 @@ RUN set -eux; \
     fi; \
     awk 'BEGIN{skip=0} /^-f[[:space:]]/{next} /^torch([<=>]|$)/{next} /^torchvision([<=>]|$)/{next} {print}' /workspace/requirements.txt > /tmp/requirements_light.txt; \
     awk '/^torch([<=>]|$)|^torchvision([<=>]|$)/' /workspace/requirements.txt > /tmp/requirements_heavy.txt; \
+    awk 'BEGIN{skip=0} /^-f[[:space:]]/{next} /^torch([<=>]|$)/{next} /^torchvision([<=>]|$)/{next} {print}' /workspace/requirements.txt > /tmp/requirements_light.txt; \
     TORCH_FIND_LINKS="$(awk '/^-f[[:space:]]/{print $2; exit}' /workspace/requirements.txt)"; \
-    if [ -n "${TORCH_FIND_LINKS_LIST}" ]; then \
-        TORCH_LINK_CANDIDATES="${TORCH_FIND_LINKS_LIST}"; \
-    else \
-        TORCH_LINK_CANDIDATES="${TORCH_FIND_LINKS},https://download.pytorch.org/whl/cu121"; \
-    fi; \
-    pip_install_torch_with_fallback_links() { \
-        requirement="$1"; \
-        links_csv="$2"; \
-        for links in $(echo "${links_csv}" | tr ',' ' '); do \
-            [ -n "${links}" ] || continue; \
-            echo "[pip][torch] try index-url: ${links} for ${requirement}"; \
-            if conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v --index-url "${links}" --trusted-host download.pytorch.org "${requirement}"; then \
-                return 0; \
-            fi; \
-            echo "[pip][torch] failed index-url: ${links} for ${requirement}"; \
-        done; \
-        return 1; \
-    }; \
     echo "[pip] phase-1(light deps) start"; \
     while IFS= read -r requirement; do \
         case "$requirement" in \
@@ -214,29 +199,7 @@ RUN set -eux; \
                 ;; \
         esac; \
     done < /tmp/requirements_light.txt; \
-    if [ "${QUICK_DEBUG}" = "1" ]; then \
-        echo "[pip] QUICK_DEBUG=1: skip heavy deps (torch/torchvision) for fast troubleshooting"; \
-    else \
-        echo "[pip] phase-2(heavy deps: torch/torchvision) start"; \
-        while IFS= read -r requirement; do \
-            case "$requirement" in \
-                ""|\#*) continue ;; \
-                *) \
-                    echo "[pip] installing: ${requirement}"; \
-                    if [ -n "${TORCH_FIND_LINKS}" ]; then \
-                        pip_install_torch_with_fallback_links "${requirement}" "${TORCH_LINK_CANDIDATES}" || { \
-                            echo "[pip][error] failed on: ${requirement}"; \
-                            echo "[hint] You can pass --build-arg TORCH_FIND_LINKS_LIST=<url1,url2,...> to use reachable torch wheel indexes."; \
-                            exit 1; \
-                        }; \
-                    else \
-                        pip_install_with_fallback "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
-                    fi; \
-                    ;; \
-            esac; \
-        done < /tmp/requirements_heavy.txt; \
-    fi; \
-    rm -f /tmp/requirements_light.txt /tmp/requirements_heavy.txt; \
+    rm -f /tmp/requirements_light.txt; \
     echo "[pip] requirements installation finished"
 
 # 说明：torch/torchvision 版本不在 requirements 中强制锁死，按 Isaac Gym / IsaacGymEnvs 依赖链路解析。
