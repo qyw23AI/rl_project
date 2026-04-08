@@ -67,9 +67,43 @@ RUN set -eux; \
 # 说明：下面 URL 为示例版本，可按官方发布页替换为更新版本。
 ARG VGL_VERSION=3.1.1
 ARG TVNC_VERSION=3.1.2
+ARG GITHUB_RELEASE_PREFIX=
 RUN set -eux; \
-    wget -O /tmp/virtualgl.deb "https://github.com/VirtualGL/virtualgl/releases/download/${VGL_VERSION}/virtualgl_${VGL_VERSION}_amd64.deb"; \
-    wget -O /tmp/turbovnc.deb "https://github.com/TurboVNC/turbovnc/releases/download/${TVNC_VERSION}/turbovnc_${TVNC_VERSION}_amd64.deb"; \
+    download_with_fallback() { \
+        out="$1"; shift; \
+        for url in "$@"; do \
+            [ -n "$url" ] || continue; \
+            echo "[download] try: ${url}"; \
+            if curl -fL --retry 20 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 1800 -o "${out}" "${url}"; then \
+                if [ -s "${out}" ]; then \
+                    echo "[download] ok: ${url}"; \
+                    return 0; \
+                fi; \
+            fi; \
+            echo "[download] failed: ${url}"; \
+        done; \
+        return 1; \
+    }; \
+    VGL_PATH="VirtualGL/virtualgl/releases/download/${VGL_VERSION}/virtualgl_${VGL_VERSION}_amd64.deb"; \
+    TVNC_PATH="TurboVNC/turbovnc/releases/download/${TVNC_VERSION}/turbovnc_${TVNC_VERSION}_amd64.deb"; \
+    if [ -n "${GITHUB_RELEASE_PREFIX}" ]; then \
+        GITHUB_RELEASE_PREFIX="${GITHUB_RELEASE_PREFIX%/}"; \
+        VGL_CUSTOM_URL="${GITHUB_RELEASE_PREFIX}/${VGL_PATH}"; \
+        TVNC_CUSTOM_URL="${GITHUB_RELEASE_PREFIX}/${TVNC_PATH}"; \
+    else \
+        VGL_CUSTOM_URL=""; \
+        TVNC_CUSTOM_URL=""; \
+    fi; \
+    download_with_fallback /tmp/virtualgl.deb \
+        "${VGL_CUSTOM_URL}" \
+        "https://github.com/${VGL_PATH}" \
+        "https://ghproxy.com/https://github.com/${VGL_PATH}" \
+        "https://mirror.ghproxy.com/https://github.com/${VGL_PATH}"; \
+    download_with_fallback /tmp/turbovnc.deb \
+        "${TVNC_CUSTOM_URL}" \
+        "https://github.com/${TVNC_PATH}" \
+        "https://ghproxy.com/https://github.com/${TVNC_PATH}" \
+        "https://mirror.ghproxy.com/https://github.com/${TVNC_PATH}"; \
     apt-get update; \
     apt-get install -y /tmp/virtualgl.deb /tmp/turbovnc.deb; \
     rm -f /tmp/virtualgl.deb /tmp/turbovnc.deb; \
