@@ -12,6 +12,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_URL="${REPO_URL:-git@github.com:qyw23AI/rl_project.git}"
 REPO_DIR="${REPO_DIR:-${SCRIPT_DIR}}"
 IMAGE="${IMAGE:-rl-vgl:latest}"
+CONTAINER_NAME="${CONTAINER_NAME:-rl-vgl}"
+SKIP_BUILD="${SKIP_BUILD:-0}"
+RECREATE_CONTAINER="${RECREATE_CONTAINER:-0}"
 HOST_CHECKPOINT_DIR="${HOST_CHECKPOINT_DIR:-${HOME}/rl-data/checkpoints}"
 HOST_LOG_DIR="${HOST_LOG_DIR:-${HOME}/rl-data/logs}"
 MUJOCO_DIR="${HOME}/.mujoco"
@@ -83,52 +86,77 @@ if ! timeout 8 bash -lc 'cat < /dev/null > /dev/tcp/registry-1.docker.io/443' 2>
   echo "       Recommended: DOCKER_DAEMON_PROXY=http://127.0.0.1:7897 sudo -E bash ./enable_mirror_acceleration.sh"
 fi
 
-echo "[build] Building Docker image: ${IMAGE}"
-if [[ "${DOCKER_BUILDKIT_MODE}" == "0" ]]; then
-  echo "[build] Using legacy builder (DOCKER_BUILDKIT=0) to avoid docker/dockerfile frontend pull timeout."
-  echo "[build] Tip: set DOCKER_BUILDKIT_MODE=1 to get detailed streaming logs."
-  echo "[build] QUICK_DEBUG=${QUICK_DEBUG}"
-  echo "[build] PIP_USE_CN_MIRROR=${PIP_USE_CN_MIRROR}"
-  echo "[build] ISAACGYMENVS_GIT_URL=${ISAACGYMENVS_GIT_URL}"
-  echo "[build] ISAACGYM_ARCHIVE=${ISAACGYM_ARCHIVE}"
-  if [[ -n "${ISAACGYM_GIT_URL}" ]]; then
-    echo "[build] ISAACGYM_GIT_URL is set"
-  else
-    echo "[build] ISAACGYM_GIT_URL is empty (expect local /workspace/isaacgym1 source)"
+if [[ "${SKIP_BUILD}" == "1" ]]; then
+  echo "[build] SKIP_BUILD=1: skip docker build, use existing image: ${IMAGE}"
+  if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+    echo "[error] Image not found: ${IMAGE}"
+    echo "       Please build first, or run with SKIP_BUILD=0."
+    exit 1
   fi
-  DOCKER_BUILDKIT=0 docker build \
-    --build-arg QUICK_DEBUG="${QUICK_DEBUG}" \
-    --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" \
-    --build-arg ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL}" \
-    --build-arg ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL}" \
-    --build-arg ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE}" \
-    -t "${IMAGE}" .
 else
-  echo "[build] Using BuildKit (DOCKER_BUILDKIT=1, --progress=${DOCKER_BUILD_PROGRESS})."
-  echo "[build] QUICK_DEBUG=${QUICK_DEBUG}"
-  echo "[build] PIP_USE_CN_MIRROR=${PIP_USE_CN_MIRROR}"
-  echo "[build] ISAACGYMENVS_GIT_URL=${ISAACGYMENVS_GIT_URL}"
-  echo "[build] ISAACGYM_ARCHIVE=${ISAACGYM_ARCHIVE}"
-  if [[ -n "${ISAACGYM_GIT_URL}" ]]; then
-    echo "[build] ISAACGYM_GIT_URL is set"
+  echo "[build] Building Docker image: ${IMAGE}"
+  if [[ "${DOCKER_BUILDKIT_MODE}" == "0" ]]; then
+    echo "[build] Using legacy builder (DOCKER_BUILDKIT=0) to avoid docker/dockerfile frontend pull timeout."
+    echo "[build] Tip: set DOCKER_BUILDKIT_MODE=1 to get detailed streaming logs."
+    echo "[build] QUICK_DEBUG=${QUICK_DEBUG}"
+    echo "[build] PIP_USE_CN_MIRROR=${PIP_USE_CN_MIRROR}"
+    echo "[build] ISAACGYMENVS_GIT_URL=${ISAACGYMENVS_GIT_URL}"
+    echo "[build] ISAACGYM_ARCHIVE=${ISAACGYM_ARCHIVE}"
+    if [[ -n "${ISAACGYM_GIT_URL}" ]]; then
+      echo "[build] ISAACGYM_GIT_URL is set"
+    else
+      echo "[build] ISAACGYM_GIT_URL is empty (expect local /workspace/isaacgym1 source)"
+    fi
+    DOCKER_BUILDKIT=0 docker build \
+      --build-arg QUICK_DEBUG="${QUICK_DEBUG}" \
+      --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" \
+      --build-arg ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL}" \
+      --build-arg ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL}" \
+      --build-arg ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE}" \
+      -t "${IMAGE}" .
   else
-    echo "[build] ISAACGYM_GIT_URL is empty (expect local /workspace/isaacgym1 source)"
+    echo "[build] Using BuildKit (DOCKER_BUILDKIT=1, --progress=${DOCKER_BUILD_PROGRESS})."
+    echo "[build] QUICK_DEBUG=${QUICK_DEBUG}"
+    echo "[build] PIP_USE_CN_MIRROR=${PIP_USE_CN_MIRROR}"
+    echo "[build] ISAACGYMENVS_GIT_URL=${ISAACGYMENVS_GIT_URL}"
+    echo "[build] ISAACGYM_ARCHIVE=${ISAACGYM_ARCHIVE}"
+    if [[ -n "${ISAACGYM_GIT_URL}" ]]; then
+      echo "[build] ISAACGYM_GIT_URL is set"
+    else
+      echo "[build] ISAACGYM_GIT_URL is empty (expect local /workspace/isaacgym1 source)"
+    fi
+    DOCKER_BUILDKIT=1 docker build \
+      --progress="${DOCKER_BUILD_PROGRESS}" \
+      --build-arg QUICK_DEBUG="${QUICK_DEBUG}" \
+      --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" \
+      --build-arg ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL}" \
+      --build-arg ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL}" \
+      --build-arg ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE}" \
+      -t "${IMAGE}" .
   fi
-  DOCKER_BUILDKIT=1 docker build \
-    --progress="${DOCKER_BUILD_PROGRESS}" \
-    --build-arg QUICK_DEBUG="${QUICK_DEBUG}" \
-    --build-arg PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR}" \
-    --build-arg ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL}" \
-    --build-arg ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL}" \
-    --build-arg ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE}" \
-    -t "${IMAGE}" .
 fi
 
 echo "[run] Starting container with GPU + MuJoCo mount + enlarged /dev/shm..."
 # 安全提示：
 # - 建议仅绑定到 127.0.0.1:5901，然后通过 SSH 隧道访问，避免公网暴露 VNC。
 # - 不要把 5901 直接开放到公网防火墙。
-docker run -d --name rl-vgl \
+if docker container inspect "${CONTAINER_NAME}" >/dev/null 2>&1; then
+  if [[ "${RECREATE_CONTAINER}" == "1" ]]; then
+    echo "[run] RECREATE_CONTAINER=1: removing existing container ${CONTAINER_NAME}"
+    docker rm -f "${CONTAINER_NAME}" >/dev/null
+  else
+    if [[ "$(docker inspect -f '{{.State.Running}}' "${CONTAINER_NAME}")" == "true" ]]; then
+      echo "[run] Container ${CONTAINER_NAME} is already running."
+      exit 0
+    fi
+    echo "[run] Starting existing container: ${CONTAINER_NAME}"
+    docker start "${CONTAINER_NAME}" >/dev/null
+    echo "[ok] Container started: ${CONTAINER_NAME}"
+    exit 0
+  fi
+fi
+
+docker run -d --name "${CONTAINER_NAME}" \
   --gpus all \
   --shm-size=4g \
   -e DISPLAY=:1 \

@@ -179,6 +179,66 @@ VNC 安全访问方式：
 6. 本机通过 SSH 隧道访问 VNC：
   - `ssh -N -L 5901:127.0.0.1:5901 <user>@<server_ip>`
 
+### run_remote.sh 详细使用方法
+
+脚本入口： [run_remote.sh](run_remote.sh)
+
+当前脚本支持三种常见模式：
+
+1. 首次部署（构建 + 新建并启动容器）
+  - `bash ./run_remote.sh`
+
+2. 只启动已有容器（不重建镜像）
+  - `SKIP_BUILD=1 bash ./run_remote.sh`
+  - 适用场景：你已经有可用镜像，只想快速把容器拉起来。
+
+3. 强制重建容器（可选是否跳过构建）
+  - 重建镜像并重建容器：
+    - `RECREATE_CONTAINER=1 bash ./run_remote.sh`
+  - 不构建镜像，仅删除旧容器并基于现有镜像重建：
+    - `SKIP_BUILD=1 RECREATE_CONTAINER=1 bash ./run_remote.sh`
+
+脚本对容器存在状态的行为：
+
+- 若容器不存在：执行 `docker run` 新建并启动。
+- 若容器已存在且运行中：脚本直接提示“已运行”并退出。
+- 若容器已存在但未运行：脚本执行 `docker start`。
+- 若设置 `RECREATE_CONTAINER=1`：先 `docker rm -f` 再新建容器。
+
+常用环境变量（建议按需覆盖）：
+
+- `IMAGE`：镜像名，默认 `rl-vgl:latest`
+- `CONTAINER_NAME`：容器名，默认 `rl-vgl`
+- `SKIP_BUILD`：是否跳过构建（`1` 跳过，默认 `0`）
+- `RECREATE_CONTAINER`：是否强制删旧容器重建（`1` 开启，默认 `0`）
+- `DOCKER_BUILDKIT_MODE`：构建器模式（默认 `0`，即 legacy builder）
+- `DOCKER_BUILD_PROGRESS`：BuildKit 日志模式（默认 `plain`）
+- `QUICK_DEBUG`：依赖快速调试开关（默认 `0`）
+- `PIP_USE_CN_MIRROR`：pip 国内镜像开关（默认 `1`）
+- `HOST_CHECKPOINT_DIR`：宿主机 checkpoint 挂载目录
+- `HOST_LOG_DIR`：宿主机 logs 挂载目录
+
+常见示例：
+
+```bash
+# 仅启动现有容器
+SKIP_BUILD=1 bash ./run_remote.sh
+
+# 镜像名/容器名自定义 + 仅启动
+IMAGE=myrepo/rl-vgl:latest CONTAINER_NAME=rl-vgl-dev SKIP_BUILD=1 bash ./run_remote.sh
+
+# 强制重建容器，但不重建镜像
+SKIP_BUILD=1 RECREATE_CONTAINER=1 bash ./run_remote.sh
+
+# 首次构建时使用 BuildKit
+DOCKER_BUILDKIT_MODE=1 DOCKER_BUILD_PROGRESS=plain bash ./run_remote.sh
+```
+
+注意：
+
+- `SKIP_BUILD=1` 时，若本地不存在 `IMAGE`，脚本会报错退出并提示先构建。
+- 脚本默认把 VNC 映射到 `127.0.0.1:5901`，建议继续通过 SSH 隧道访问，不要直接暴露公网端口。
+
 ## 8) 脚本职责总览
 
 - [install_docker_gpu.sh](install_docker_gpu.sh)
@@ -190,6 +250,7 @@ VNC 安全访问方式：
   - 在本机创建 SSH 反向转发，把本机代理暴露给服务器
 - [run_remote.sh](run_remote.sh)
   - 同步代码和子模块、下载 MuJoCo runtime、构建镜像并启动容器
+  - 支持 `SKIP_BUILD=1` 仅启动、`RECREATE_CONTAINER=1` 强制重建容器
   - 默认使用 `DOCKER_BUILDKIT=0` 规避 `docker/dockerfile:1` 拉取超时
 - [build_and_push.sh](build_and_push.sh)
   - 本地构建、GPU 快测、打 tag 并推送镜像
