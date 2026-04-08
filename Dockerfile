@@ -20,6 +20,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # - libglvnd0/libglx-mesa0: GLVND/GLX 运行时支持。
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ninja-build \
     python3 \
     python3-pip \
     python3-setuptools \

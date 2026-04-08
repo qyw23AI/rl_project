@@ -1,4 +1,4 @@
-# RL 容器与 Isaac Gym 问题归档（2026-04-07）
+# RL 容器与 Isaac Gym 问题归档（2026-04-07 ~ 2026-04-08）
 
 ## 1) 下载与构建阶段
 
@@ -52,6 +52,21 @@
 - 处理：安装 `ninja`。
 - 状态：已解决。
 
+### 2.6 `ninja` 下载/安装的持久性说明（2026-04-08）
+- 现象：在容器内执行训练时报 `RuntimeError: Ninja is required to load C++ extensions`，手动安装后恢复。
+- 根因：当前运行容器镜像中未预装 `ninja`，依赖在运行时才被触发。
+- 处理：
+	- 临时修复：在运行中的容器内执行 `conda run -n rl python -m pip install ninja`；
+	- 持久化修复：
+		- 在 `requirements.txt` 增加 `ninja`；
+		- 在 `Dockerfile` 的 apt 依赖增加 `ninja-build`；
+		- 重建镜像后，新容器默认具备该依赖。
+- 持久性结论：
+	- 仅在“当前容器内手动安装”的下载结果是**容器级持久**（容器不删则保留，`docker rm` 后丢失）；
+	- 不会自动回写到旧镜像；
+	- 只有重建镜像并用新镜像创建容器，才是**长期持久**。
+- 状态：已解决（临时修复已生效，持久化修复已提交到构建配置）。
+
 ## 3) 运行时图形与库加载问题
 
 ### 3.1 `ImportError: libpython3.8.so.1.0: cannot open shared object file`
@@ -80,6 +95,24 @@
 	- 显式指定 `xstartup` 启动 XFCE；
 	- 临时使用本地隧道场景可用的 `-SecurityTypes None`。
 - 状态：已解决（当前 VNC 会话稳定）。
+
+### 3.4 容器 `docker start` 后立即退出，`docker exec` 提示容器未运行
+- 现象：执行 `SKIP_BUILD=1 ./run_remote.sh` 后显示容器已启动，但很快 `docker ps -a` 变为 `Exited (1)`；随后 `docker exec -it rl-vgl bash` 报容器未运行。
+- 根因：
+	- TurboVNC 首次启动进入交互式密码设置，非交互场景下失败并退出；
+	- TurboVNC 默认会话选择不到可用桌面，回退到 TWM 失败导致 Xvnc 进程终止。
+- 处理：
+	- 在 `docker_entrypoint.sh` 增加非交互式 `vncpasswd` 初始化（支持 `VNC_PASSWORD` 环境变量）；
+	- 启动 VNC 时显式指定 `-wm xfce-session`，避免默认会话回退失败；
+	- 在 `run_remote.sh` 的 `docker run` 增加：
+		- `-e VNC_PASSWORD=${VNC_PASSWORD:-rlvnc123}`
+		- `-v ${SCRIPT_DIR}/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh:ro`
+	  以便不重建镜像也能应用入口脚本修复。
+- 验证：
+	- `docker ps` 显示 `rl-vgl` 持续 `Up`；
+	- 容器日志出现 `Using 'xfce' window manager` 与 `Executing ... startxfce4`；
+	- `docker exec rl-vgl ...` 可正常进入并看到 `Xvnc`、`xfce4-session` 进程。
+- 状态：已解决（2026-04-08）。
 
 ## 4) GPU 兼容性问题（核心未解）
 
