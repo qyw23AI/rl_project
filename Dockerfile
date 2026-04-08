@@ -158,6 +158,7 @@ WORKDIR /workspace
 COPY requirements.txt /workspace/requirements.txt
 ARG QUICK_DEBUG=0
 ARG PIP_USE_CN_MIRROR=1
+ARG TORCH_FIND_LINKS_LIST=
 RUN set -eux; \
     pip_install_with_fallback() { \
         requirement="$1"; \
@@ -185,6 +186,25 @@ RUN set -eux; \
     awk 'BEGIN{skip=0} /^-f[[:space:]]/{next} /^torch([<=>]|$)/{next} /^torchvision([<=>]|$)/{next} {print}' /workspace/requirements.txt > /tmp/requirements_light.txt; \
     awk '/^torch([<=>]|$)|^torchvision([<=>]|$)/' /workspace/requirements.txt > /tmp/requirements_heavy.txt; \
     TORCH_FIND_LINKS="$(awk '/^-f[[:space:]]/{print $2; exit}' /workspace/requirements.txt)"; \
+    if [ -n "${TORCH_FIND_LINKS_LIST}" ]; then \
+        TORCH_LINK_CANDIDATES="${TORCH_FIND_LINKS_LIST}"; \
+    else \
+        TORCH_LINK_CANDIDATES="${TORCH_FIND_LINKS},https://download.pytorch.org/whl/cu121"; \
+    fi; \
+    pip_install_torch_with_fallback_links() { \
+        requirement="$1"; \
+        links_csv="$2"; \
+        for links in $(echo "${links_csv}" | tr ',' ' '); do \
+            [ -n "${links}" ] || continue; \
+            echo "[pip][torch] try links: ${links} for ${requirement}"; \
+            if conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -f "${links}" "${requirement}"; then \
+                return 0; \
+            fi; \
+            echo "[pip][torch] failed links: ${links} for ${requirement}"; \
+        done; \
+        echo "[pip][torch] fallback to official pypi for: ${requirement}"; \
+        conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -i https://pypi.org/simple --trusted-host pypi.org --trusted-host files.pythonhosted.org "${requirement}"; \
+    }; \
     echo "[pip] phase-1(light deps) start"; \
     while IFS= read -r requirement; do \
         case "$requirement" in \
@@ -205,9 +225,10 @@ RUN set -eux; \
                 *) \
                     echo "[pip] installing: ${requirement}"; \
                     if [ -n "${TORCH_FIND_LINKS}" ]; then \
-                        conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -f "${TORCH_FIND_LINKS}" "${requirement}" || { \
-                            echo "[pip][retry] fallback to official pypi for: ${requirement}"; \
-                            conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -f "${TORCH_FIND_LINKS}" -i https://pypi.org/simple --trusted-host pypi.org --trusted-host files.pythonhosted.org "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
+                        pip_install_torch_with_fallback_links "${requirement}" "${TORCH_LINK_CANDIDATES}" || { \
+                            echo "[pip][error] failed on: ${requirement}"; \
+                            echo "[hint] You can pass --build-arg TORCH_FIND_LINKS_LIST=<url1,url2,...> to use reachable torch wheel indexes."; \
+                            exit 1; \
                         }; \
                     else \
                         pip_install_with_fallback "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
