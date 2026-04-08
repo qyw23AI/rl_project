@@ -196,14 +196,13 @@ RUN set -eux; \
         links_csv="$2"; \
         for links in $(echo "${links_csv}" | tr ',' ' '); do \
             [ -n "${links}" ] || continue; \
-            echo "[pip][torch] try links: ${links} for ${requirement}"; \
-            if conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -f "${links}" "${requirement}"; then \
+            echo "[pip][torch] try index-url: ${links} for ${requirement}"; \
+            if conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v --index-url "${links}" --trusted-host download.pytorch.org "${requirement}"; then \
                 return 0; \
             fi; \
-            echo "[pip][torch] failed links: ${links} for ${requirement}"; \
+            echo "[pip][torch] failed index-url: ${links} for ${requirement}"; \
         done; \
-        echo "[pip][torch] fallback to official pypi for: ${requirement}"; \
-        conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -i https://pypi.org/simple --trusted-host pypi.org --trusted-host files.pythonhosted.org "${requirement}"; \
+        return 1; \
     }; \
     echo "[pip] phase-1(light deps) start"; \
     while IFS= read -r requirement; do \
