@@ -112,11 +112,32 @@ RUN set -eux; \
 # 安装 Miniconda（按你给的步骤自动化）：
 # wget Miniconda 安装脚本 -> 执行静默安装 -> 创建 rl 环境。
 ARG CONDA_DIR=/opt/conda
+ARG MINICONDA_INSTALLER=Miniconda3-latest-Linux-x86_64.sh
+ARG MINICONDA_PRIMARY_URL=https://repo.anaconda.com/miniconda
 RUN set -eux; \
-    wget -O /tmp/Miniconda3-latest-Linux-x86_64.sh "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"; \
-    chmod +x /tmp/Miniconda3-latest-Linux-x86_64.sh; \
-    /tmp/Miniconda3-latest-Linux-x86_64.sh -b -p "${CONDA_DIR}"; \
-    rm -f /tmp/Miniconda3-latest-Linux-x86_64.sh; \
+    download_with_fallback() { \
+        out="$1"; shift; \
+        for url in "$@"; do \
+            [ -n "$url" ] || continue; \
+            echo "[download] try: ${url}"; \
+            if curl -fL --retry 20 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 3600 -o "${out}" "${url}"; then \
+                if [ -s "${out}" ]; then \
+                    echo "[download] ok: ${url}"; \
+                    return 0; \
+                fi; \
+            fi; \
+            echo "[download] failed: ${url}"; \
+        done; \
+        return 1; \
+    }; \
+    download_with_fallback /tmp/miniconda.sh \
+        "${MINICONDA_PRIMARY_URL%/}/${MINICONDA_INSTALLER}" \
+        "https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/${MINICONDA_INSTALLER}" \
+        "https://mirrors.ustc.edu.cn/anaconda/miniconda/${MINICONDA_INSTALLER}" \
+        "https://mirrors.bfsu.edu.cn/anaconda/miniconda/${MINICONDA_INSTALLER}"; \
+    chmod +x /tmp/miniconda.sh; \
+    /tmp/miniconda.sh -b -p "${CONDA_DIR}"; \
+    rm -f /tmp/miniconda.sh; \
     "${CONDA_DIR}/bin/conda" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main; \
     "${CONDA_DIR}/bin/conda" tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r; \
     "${CONDA_DIR}/bin/conda" clean -afy; \
