@@ -159,6 +159,16 @@ COPY requirements.txt /workspace/requirements.txt
 ARG QUICK_DEBUG=0
 ARG PIP_USE_CN_MIRROR=1
 RUN set -eux; \
+    pip_install_with_fallback() { \
+        requirement="$1"; \
+        # 第一次：沿用当前 pip 配置（可能是国内镜像，也可能是默认源）
+        if conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v "${requirement}"; then \
+            return 0; \
+        fi; \
+        # 第二次：显式切到官方 PyPI，避免单一镜像波动导致构建失败
+        echo "[pip][retry] fallback to official pypi for: ${requirement}"; \
+        conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -i https://pypi.org/simple --trusted-host pypi.org --trusted-host files.pythonhosted.org "${requirement}"; \
+    }; \
     # 可通过 PIP_USE_CN_MIRROR 控制是否启用国内镜像。
     # - 1: 使用清华镜像（无代理或国际链路较慢时通常更稳）
     # - 0: 不使用国内镜像（代理质量较好时通常更快）
@@ -181,7 +191,7 @@ RUN set -eux; \
             ""|\#*) continue ;; \
             *) \
                 echo "[pip] installing: ${requirement}"; \
-                conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
+                pip_install_with_fallback "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
                 ;; \
         esac; \
     done < /tmp/requirements_light.txt; \
@@ -195,9 +205,12 @@ RUN set -eux; \
                 *) \
                     echo "[pip] installing: ${requirement}"; \
                     if [ -n "${TORCH_FIND_LINKS}" ]; then \
-                        conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v -f "${TORCH_FIND_LINKS}" "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
+                        conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -f "${TORCH_FIND_LINKS}" "${requirement}" || { \
+                            echo "[pip][retry] fallback to official pypi for: ${requirement}"; \
+                            conda run -n rl python -m pip install --no-cache-dir --prefer-binary --retries 20 --default-timeout 120 --progress-bar on -v -f "${TORCH_FIND_LINKS}" -i https://pypi.org/simple --trusted-host pypi.org --trusted-host files.pythonhosted.org "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
+                        }; \
                     else \
-                        conda run -n rl python -m pip install --no-cache-dir --retries 20 --default-timeout 120 --progress-bar on -v "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
+                        pip_install_with_fallback "${requirement}" || { echo "[pip][error] failed on: ${requirement}"; exit 1; }; \
                     fi; \
                     ;; \
             esac; \
