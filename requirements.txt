@@ -41,6 +41,7 @@ scipy
 tensorboard
 wandb
 onnxruntime
+onnx>=1.14.0
 mujoco-python-viewer
 
 # 如需特定私有 torch wheel，可将上方 -f URL 替换为企业私有源或自定义 wheel 索引。

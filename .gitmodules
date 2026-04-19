@@ -1,3 +1,14 @@
 [submodule "IsaacGymEnvs"]
 	path = IsaacGymEnvs
 	url = https://github.com/isaac-sim/IsaacGymEnvs.git
+
+[submodule "legged_gym"]
+	path = legged_gym
+	url = https://github.com/leggedrobotics/legged_gym.git
+
+[submodule "rsl_rl"]
+	path = rsl_rl
+	url = https://github.com/leggedrobotics/rsl_rl.git
+[submodule "legged_gym1"]
+	path = legged_gym1
+	url = https://github.com/J-jjp/rl_locomotion
