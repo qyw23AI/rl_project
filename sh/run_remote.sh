@@ -172,10 +172,11 @@ docker run -d --name "${CONTAINER_NAME}" \
   --shm-size=4g \
   -e DISPLAY=:1 \
   -e VNC_PASSWORD="${VNC_PASSWORD:-rlvnc123}" \
+  -v "${REPO_ROOT}:/workspace" \
   -v "${HOME}/.mujoco:/root/.mujoco:ro" \
   -v "${HOST_CHECKPOINT_DIR}:/workspace/checkpoints" \
   -v "${HOST_LOG_DIR}:/workspace/logs" \
-  -v "${SCRIPT_DIR}/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh:ro" \
+  -v "${REPO_ROOT}/sh/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh:ro" \
   -p 127.0.0.1:5901:5901 \
   "${IMAGE}"
 
