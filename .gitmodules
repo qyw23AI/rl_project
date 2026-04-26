@@ -9,6 +9,6 @@
 [submodule "rsl_rl"]
 	path = rsl_rl
 	url = https://github.com/leggedrobotics/rsl_rl.git
-[submodule "legged_gym1"]
-	path = legged_gym1
-	url = https://github.com/J-jjp/rl_locomotion
+# [submodule "legged_gym1"]
+# 	path = legged_gym1
+# 	url = https://github.com/J-jjp/rl_locomotion
