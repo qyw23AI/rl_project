@@ -1,1 +1,8 @@
 *.pyc
+
+isaacgym1/isaacgym/python/isaacgym/__pycache__/gymapi.cpython-38.pyc
+isaacgym1/isaacgym/python/isaacgym/__pycache__/gymdeps.cpython-38.pyc
+isaacgym1/isaacgym/python/isaacgym/__pycache__/gymtorch.cpython-38.pyc
+isaacgym1/isaacgym/python/isaacgym/__pycache__/gymutil.cpython-38.pyc
+isaacgym1/isaacgym/python/isaacgym/__pycache__/terrain_utils.cpython-38.pyc
+isaacgym1/isaacgym/python/isaacgym/__pycache__/torch_utils.cpython-38.pyc
