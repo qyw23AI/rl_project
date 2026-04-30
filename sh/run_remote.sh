@@ -223,19 +223,26 @@ if docker container inspect "${CONTAINER_NAME}" >/dev/null 2>&1; then
   fi
 fi
 
+if nvidia-smi >/dev/null 2>&1; then
+    GPU_ARG="--gpus all"
+else
+    GPU_ARG=""
+fi
+
 docker run -d --name "${CONTAINER_NAME}" \
-  --gpus all \
+  $GPU_ARG \
   --shm-size=4g \
   -e DISPLAY=:1 \
   -e VNC_PASSWORD="${VNC_PASSWORD:-rlvnc123}" \
-  -v "${REPO_ROOT}:/workspace" \
+  -v "/home/ubuntu/rl_project:/workspace/rl_project" \
+  -v "/home/ubuntu/MyHIMLoco:/workspace/MyHIMLoco" \
   -v "${HOME}/.mujoco:/root/.mujoco:ro" \
   -v "${HOST_CHECKPOINT_DIR}:/workspace/checkpoints" \
   -v "${HOST_LOG_DIR}:/workspace/logs" \
   -v "${REPO_ROOT}/sh/docker_entrypoint.sh:/usr/local/bin/docker_entrypoint.sh:ro" \
   -p 127.0.0.1:5901:5901 \
   "${IMAGE}"
-
+  # -v "${REPO_ROOT}:/workspace" \
 echo "[hint] Use SSH tunnel from local machine:"
 echo "       ssh -N -L 5901:127.0.0.1:5901 <user>@<server_ip>"
 echo "       Then connect your VNC client to: 127.0.0.1:5901"
