@@ -4,7 +4,7 @@
 
 [submodule "legged_gym"]
 	path = legged_gym
-	url = https://github.com/leggedrobotics/legged_gym.git
+	url = https://github.com/qyw23AI/legged_gym.git
 
 [submodule "rsl_rl"]
 	path = rsl_rl

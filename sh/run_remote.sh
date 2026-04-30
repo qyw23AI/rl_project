@@ -14,24 +14,80 @@ fi
 # - IMAGE: 构建后的镜像名
 # - HOST_CHECKPOINT_DIR: 宿主机保存 checkpoints 的目录
 # - HOST_LOG_DIR: 宿主机保存 logs 的目录
+# REPO_URL="${REPO_URL:-git@github.com:qyw23AI/rl_project.git}"
+# REPO_DIR="${REPO_DIR:-${REPO_ROOT}}"
+# IMAGE="${IMAGE:-rl-vgl:latest}"
+# CONTAINER_NAME="${CONTAINER_NAME:-rl-vgl}"
+# SKIP_BUILD="${SKIP_BUILD:-1}"
+# RECREATE_CONTAINER="${RECREATE_CONTAINER:-0}"
+# HOST_CHECKPOINT_DIR="${HOST_CHECKPOINT_DIR:-${HOME}/rl-data/checkpoints}"
+# HOST_LOG_DIR="${HOST_LOG_DIR:-${HOME}/rl-data/logs}"
+# MUJOCO_DIR="${HOME}/.mujoco"
+# MUJOCO_TAR="mujoco210-linux-x86_64.tar.gz"
+# MUJOCO_URL="https://mujoco.org/download/${MUJOCO_TAR}"
+# DOCKER_BUILDKIT_MODE="${DOCKER_BUILDKIT_MODE:-0}"
+# DOCKER_BUILD_PROGRESS="${DOCKER_BUILD_PROGRESS:-plain}"
+# QUICK_DEBUG="${QUICK_DEBUG:-0}"
+# PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR:-1}"
+# ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL:-https://github.com/isaac-sim/IsaacGymEnvs.git}"
+# ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL:-}"
+# ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE:-/workspace/issacgym.tar.xz}"
+# GIT_JOBS="${GIT_JOBS:-8}"
+# 仓库 URL，如果环境变量 REPO_URL 没有定义，则使用默认值
 REPO_URL="${REPO_URL:-git@github.com:qyw23AI/rl_project.git}"
+
+# 仓库在本地的目录，如果 REPO_DIR 没定义，则使用 REPO_ROOT
 REPO_DIR="${REPO_DIR:-${REPO_ROOT}}"
+
+# Docker 镜像名称，如果 IMAGE 没定义，默认用 rl-vgl:latest
 IMAGE="${IMAGE:-rl-vgl:latest}"
+
+# 容器名称，如果 CONTAINER_NAME 没定义，默认用 rl-vgl
 CONTAINER_NAME="${CONTAINER_NAME:-rl-vgl}"
+
+# 是否跳过 Docker 镜像构建（0=构建，1=跳过），默认跳过
 SKIP_BUILD="${SKIP_BUILD:-1}"
+
+# 是否删除已存在容器并重新创建，0=不重建，1=重建
 RECREATE_CONTAINER="${RECREATE_CONTAINER:-0}"
+
+# 宿主机上保存 checkpoints 的目录，如果没定义则默认在 ~/rl-data/checkpoints
 HOST_CHECKPOINT_DIR="${HOST_CHECKPOINT_DIR:-${HOME}/rl-data/checkpoints}"
+
+# 宿主机上保存 logs 的目录，如果没定义则默认在 ~/rl-data/logs
 HOST_LOG_DIR="${HOST_LOG_DIR:-${HOME}/rl-data/logs}"
+
+# MuJoCo 安装目录，固定为用户主目录下的 .mujoco
 MUJOCO_DIR="${HOME}/.mujoco"
+
+# MuJoCo 压缩包名称
 MUJOCO_TAR="mujoco210-linux-x86_64.tar.gz"
+
+# MuJoCo 下载 URL，根据上面的压缩包名生成
 MUJOCO_URL="https://mujoco.org/download/${MUJOCO_TAR}"
+
+# Docker 构建模式，0=传统模式，1=BuildKit 模式，默认 0
 DOCKER_BUILDKIT_MODE="${DOCKER_BUILDKIT_MODE:-0}"
+
+# Docker build 输出进度方式，plain=普通模式，默认 plain
 DOCKER_BUILD_PROGRESS="${DOCKER_BUILD_PROGRESS:-plain}"
+
+# 快速调试开关，0=关闭，1=开启，默认关闭
 QUICK_DEBUG="${QUICK_DEBUG:-0}"
+
+# pip 是否使用国内镜像源，0=否，1=是，默认是
 PIP_USE_CN_MIRROR="${PIP_USE_CN_MIRROR:-1}"
+
+# Isaac Gym Envs 仓库 URL，默认官方 GitHub 地址
 ISAACGYMENVS_GIT_URL="${ISAACGYMENVS_GIT_URL:-https://github.com/isaac-sim/IsaacGymEnvs.git}"
+
+# Isaac Gym 原始源码仓库 URL，如果没有可留空
 ISAACGYM_GIT_URL="${ISAACGYM_GIT_URL:-}"
+
+# Isaac Gym 压缩包路径，用于本地构建镜像，默认 /workspace/issacgym.tar.xz
 ISAACGYM_ARCHIVE="${ISAACGYM_ARCHIVE:-/workspace/issacgym.tar.xz}"
+
+# git clone / submodule 更新时使用的并行任务数，默认 8
 GIT_JOBS="${GIT_JOBS:-8}"
 
 require_cmd() {
